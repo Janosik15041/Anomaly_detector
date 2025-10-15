@@ -3,8 +3,8 @@ import pandas as pd
 
 # Configuration
 TICKER = "AAPL"
-PERIOD = "5d"  # 5 days
-INTERVAL = "1m"  # 1 minute intervals
+PERIOD = "1y"  # 5 days
+INTERVAL = "1h"  # 1 minute intervals
 
 # Fetch data
 ticker = yf.Ticker(TICKER)
