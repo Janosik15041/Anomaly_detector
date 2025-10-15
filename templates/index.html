@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📈 Stock Anomaly Detector</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0e1117;
+            color: #fafafa;
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: #262730;
+            padding: 20px;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        h2 {
+            margin: 20px 0 10px 0;
+            font-size: 18px;
+            color: #fafafa;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #262730;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #a3a8b4;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .metric-delta {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .positive { color: #00cc96; }
+        .negative { color: #ef553b; }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            background: #0e1117;
+            color: #fafafa;
+            border: 1px solid #464651;
+            border-radius: 4px;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        button {
+            padding: 10px;
+            background: #ff4b4b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        button:hover { background: #cc3c3c; }
+        button:disabled { background: #464651; cursor: not-allowed; }
+        button.primary { background: #0068c9; }
+        button.primary:hover { background: #005aa6; }
+
+        .speed-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin: 10px 0;
+        }
+
+        .speed-buttons button {
+            padding: 8px;
+            font-size: 12px;
+        }
+
+        .speed-buttons button.active {
+            background: #0068c9;
+        }
+
+        .info-section {
+            background: #262730;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        .status-streaming { background: #00cc96; color: white; }
+        .status-paused { background: #ffa500; color: white; }
+        .status-stopped { background: #464651; color: white; }
+
+        #chart {
+            margin: 20px 0;
+            background: #262730;
+            border-radius: 8px;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h1>📈 Stock Anomaly Detector</h1>
+            <p style="color: #a3a8b4; margin-bottom: 20px;">Real-time streaming • No page reloads</p>
+
+            <h2>⚙️ Settings</h2>
+            <label for="fileSelect" style="color: #a3a8b4; font-size: 12px;">Select Stock Data</label>
+            <select id="fileSelect" onchange="loadFile()">
+                {% for file in data_files %}
+                <option value="{{ file }}">{{ file.replace('.csv', '').replace('_', ' ').upper() }}</option>
+                {% endfor %}
+            </select>
+
+            <h2>🎮 Controls</h2>
+            <div id="statusBadge" class="status-badge status-stopped">⏹️ Stopped</div>
+            <div class="button-group">
+                <button id="startBtn" class="primary" onclick="startStreaming()">▶️ Start</button>
+                <button id="pauseBtn" onclick="pauseStreaming()">⏸️ Pause</button>
+                <button id="stopBtn" onclick="stopStreaming()">⏹️ Stop</button>
+                <button id="resetBtn" onclick="resetStreaming()">🔄 Reset</button>
+            </div>
+
+            <h2>⚡ Playback Speed</h2>
+            <div class="speed-buttons">
+                <button onclick="setSpeed(1)" data-speed="1" class="active">1x</button>
+                <button onclick="setSpeed(2)" data-speed="2">2x</button>
+                <button onclick="setSpeed(3)" data-speed="3">3x</button>
+                <button onclick="setSpeed(5)" data-speed="5">5x</button>
+                <button onclick="setSpeed(10)" data-speed="10">10x</button>
+                <button onclick="setSpeed(100)" data-speed="100">100x</button>
+            </div>
+
+            <h2>📊 Chart Window</h2>
+            <input type="range" id="windowSize" min="50" max="500" step="50" value="50" oninput="setWindowSize(this.value)">
+            <p style="color: #a3a8b4; font-size: 12px;">Showing last <span id="windowSizeLabel">50</span> points</p>
+
+            <div class="info-section">
+                <h2>📊 Streaming Info</h2>
+                <div class="info-row">
+                    <span>Total Points:</span>
+                    <span id="totalPoints">0</span>
+                </div>
+                <div class="info-row">
+                    <span>Current:</span>
+                    <span id="currentIndex">0</span>
+                </div>
+                <div class="info-row">
+                    <span>Progress:</span>
+                    <span id="progress">0.0%</span>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h2>📅 Data Range</h2>
+                <div class="info-row">
+                    <span>From:</span>
+                    <span id="dateFrom">-</span>
+                </div>
+                <div class="info-row">
+                    <span>To:</span>
+                    <span id="dateTo">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="metrics" id="metrics">
+                <div class="metric-card">
+                    <div class="metric-label">Data Points Loaded</div>
+                    <div class="metric-value" id="metricPoints">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Current Price</div>
+                    <div class="metric-value" id="metricPrice">$0.00</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Change</div>
+                    <div class="metric-value" id="metricChange">$0.00</div>
+                    <div class="metric-delta" id="metricChangePct">0.00%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Avg Volume</div>
+                    <div class="metric-value" id="metricVolume">0</div>
+                </div>
+            </div>
+
+            <div id="chart"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentSpeed = 1;
+
+        // Initialize with first file
+        window.onload = function() {
+            loadFile();
+        };
+
+        function loadFile() {
+            const filename = document.getElementById('fileSelect').value;
+            fetch('/api/load_file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('totalPoints').textContent = data.total_points.toLocaleString();
+                    document.getElementById('dateFrom').textContent = data.date_from;
+                    document.getElementById('dateTo').textContent = data.date_to;
+                }
+            });
+        }
+
+        function startStreaming() {
+            socket.emit('start_streaming');
+        }
+
+        function pauseStreaming() {
+            socket.emit('pause_streaming');
+        }
+
+        function stopStreaming() {
+            socket.emit('stop_streaming');
+        }
+
+        function resetStreaming() {
+            socket.emit('reset_streaming');
+        }
+
+        function setSpeed(speed) {
+            currentSpeed = speed;
+            socket.emit('set_speed', { speed });
+
+            // Update button states
+            document.querySelectorAll('.speed-buttons button').forEach(btn => {
+                btn.classList.remove('active');
+                if (parseInt(btn.dataset.speed) === speed) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        function setWindowSize(size) {
+            document.getElementById('windowSizeLabel').textContent = size;
+            socket.emit('set_window_size', { size: parseInt(size) });
+        }
+
+        // Handle status updates
+        socket.on('status_update', function(data) {
+            const badge = document.getElementById('statusBadge');
+            const status = data.status;
+
+            if (status === 'streaming') {
+                badge.textContent = '🔴 Streaming';
+                badge.className = 'status-badge status-streaming';
+            } else if (status === 'paused') {
+                badge.textContent = '⏸️ Paused';
+                badge.className = 'status-badge status-paused';
+            } else {
+                badge.textContent = '⏹️ Stopped';
+                badge.className = 'status-badge status-stopped';
+            }
+        });
+
+        // Handle data updates (NO PAGE RELOAD!)
+        socket.on('data_update', function(data) {
+            // Update metrics
+            document.getElementById('metricPoints').textContent = data.current_index.toLocaleString();
+            document.getElementById('metricPrice').textContent = '$' + data.current_price.toFixed(2);
+
+            const change = data.current_price - data.start_price;
+            const changePct = ((change / data.start_price) * 100);
+
+            document.getElementById('metricChange').textContent = '$' + change.toFixed(2);
+            document.getElementById('metricChangePct').textContent = changePct.toFixed(2) + '%';
+            document.getElementById('metricChangePct').className = 'metric-delta ' + (changePct >= 0 ? 'positive' : 'negative');
+
+            const avgVolume = data.volume.reduce((a, b) => a + b, 0) / data.volume.length;
+            document.getElementById('metricVolume').textContent = Math.round(avgVolume).toLocaleString();
+
+            // Update progress
+            document.getElementById('currentIndex').textContent = data.current_index.toLocaleString();
+            const progress = (data.current_index / data.total_points * 100).toFixed(1);
+            document.getElementById('progress').textContent = progress + '%';
+
+            // Update chart (smooth, no reload!)
+            const trace = {
+                x: data.datetime,
+                close: data.close,
+                decreasing: {line: {color: '#ef553b'}},
+                high: data.high,
+                increasing: {line: {color: '#00cc96'}},
+                low: data.low,
+                open: data.open,
+                type: 'candlestick',
+                xaxis: 'x',
+                yaxis: 'y'
+            };
+
+            const layout = {
+                paper_bgcolor: '#262730',
+                plot_bgcolor: '#262730',
+                font: { color: '#fafafa' },
+                xaxis: {
+                    gridcolor: '#464651',
+                    rangeslider: { visible: false }
+                },
+                yaxis: {
+                    gridcolor: '#464651'
+                },
+                margin: { l: 50, r: 50, t: 20, b: 50 }
+            };
+
+            Plotly.react('chart', [trace], layout);
+        });
+
+        socket.on('streaming_complete', function() {
+            document.getElementById('statusBadge').textContent = '✅ Complete';
+            document.getElementById('statusBadge').className = 'status-badge status-stopped';
+        });
+    </script>
+</body>
+</html>
