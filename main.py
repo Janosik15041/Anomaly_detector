@@ -26,12 +26,28 @@ streaming_state = {
 }
 
 def load_stock_data(file_path):
-    """Load stock data from CSV"""
+    """Load stock data from CSV - no gap filling, use raw data only"""
     df = pd.read_csv(file_path)
     if 'Datetime' not in df.columns and 'Date' in df.columns:
         df = df.rename(columns={'Date': 'Datetime'})
     df['Datetime'] = pd.to_datetime(df['Datetime'])
     df = df.sort_values('Datetime')
+
+    # Remove duplicate consecutive values (closed hours)
+    # Keep only rows where price actually changes
+    if len(df) > 1:
+        # Calculate if values changed from previous row
+        changed = (
+            (df['Open'] != df['Open'].shift(1)) |
+            (df['High'] != df['High'].shift(1)) |
+            (df['Low'] != df['Low'].shift(1)) |
+            (df['Close'] != df['Close'].shift(1))
+        )
+        # Always keep the first row
+        changed.iloc[0] = True
+        # Filter to only changed rows
+        df = df[changed].copy()
+
     return df
 
 def stream_data():

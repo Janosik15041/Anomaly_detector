@@ -51,9 +51,15 @@
 
         .metrics {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 15px;
             margin: 20px 0;
+        }
+
+        @media (max-width: 1200px) {
+            .metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .metric-card {
@@ -161,6 +167,8 @@
             background: #262730;
             border-radius: 8px;
             padding: 10px;
+            height: calc(100vh - 250px);
+            min-height: 500px;
         }
     </style>
 </head>
@@ -356,8 +364,11 @@
             document.getElementById('progress').textContent = progress + '%';
 
             // Update chart (smooth, no reload!)
+            // Use sequential x-axis to remove gaps
+            const xIndices = Array.from({length: data.close.length}, (_, i) => i);
+
             const trace = {
-                x: data.datetime,
+                x: xIndices,
                 close: data.close,
                 decreasing: {line: {color: '#ef553b'}},
                 high: data.high,
@@ -369,18 +380,31 @@
                 yaxis: 'y'
             };
 
+            // Create tick labels showing every ~10th datetime
+            const tickSpacing = Math.max(1, Math.floor(data.datetime.length / 10));
+            const tickvals = [];
+            const ticktext = [];
+            for (let i = 0; i < data.datetime.length; i += tickSpacing) {
+                tickvals.push(i);
+                ticktext.push(data.datetime[i].split(' ')[1]); // Show time only
+            }
+
             const layout = {
                 paper_bgcolor: '#262730',
                 plot_bgcolor: '#262730',
                 font: { color: '#fafafa' },
                 xaxis: {
                     gridcolor: '#464651',
-                    rangeslider: { visible: false }
+                    rangeslider: { visible: false },
+                    tickvals: tickvals,
+                    ticktext: ticktext,
+                    tickangle: -45
                 },
                 yaxis: {
                     gridcolor: '#464651'
                 },
-                margin: { l: 50, r: 50, t: 20, b: 50 }
+                margin: { l: 50, r: 50, t: 20, b: 70 },
+                height: document.getElementById('chart').offsetHeight - 40
             };
 
             Plotly.react('chart', [trace], layout);
