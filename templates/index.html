@@ -665,73 +665,60 @@
             const examples = {
                 'rsi': {
                     name: 'RSI Overbought/Oversold',
-                    code: `# Calculate RSI and detect overbought/oversold conditions
-# Returns True if anomaly detected, False otherwise
-
-if len(window_data) < 14:
-    return False
-
-# Calculate RSI
-delta = window_data['Close'].diff()
-gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-rs = gain / loss
-rsi = 100 - (100 / (1 + rs))
-current_rsi = rsi.iloc[-1]
-
-# Detect overbought (>70) or oversold (<30)
-if current_rsi > 70:
-    description = f"RSI Overbought: {current_rsi:.2f}"
-    return True
-elif current_rsi < 30:
-    description = f"RSI Oversold: {current_rsi:.2f}"
-    return True
-
-return False`
+                    code: '# Calculate RSI and detect overbought/oversold conditions\n' +
+                          '# Returns True if anomaly detected, False otherwise\n\n' +
+                          'if len(window_data) < 14:\n' +
+                          '    return False\n\n' +
+                          '# Calculate RSI\n' +
+                          'delta = window_data[\'Close\'].diff()\n' +
+                          'gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()\n' +
+                          'loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()\n' +
+                          'rs = gain / loss\n' +
+                          'rsi = 100 - (100 / (1 + rs))\n' +
+                          'current_rsi = rsi.iloc[-1]\n\n' +
+                          '# Detect overbought (>70) or oversold (<30)\n' +
+                          'if current_rsi > 70:\n' +
+                          '    description = f"RSI Overbought: {current_rsi:.2f}"\n' +
+                          '    return True\n' +
+                          'elif current_rsi < 30:\n' +
+                          '    description = f"RSI Oversold: {current_rsi:.2f}"\n' +
+                          '    return True\n\n' +
+                          'return False'
                 },
                 'consecutive': {
                     name: 'Consecutive Price Drops',
-                    code: `# Detect 3 or more consecutive price drops
-# Returns True if anomaly detected, False otherwise
-
-if len(window_data) < 3:
-    return False
-
-# Check last 3 closes
-recent_closes = window_data['Close'].tail(3).values
-drops = 0
-
-for i in range(1, len(recent_closes)):
-    if recent_closes[i] < recent_closes[i-1]:
-        drops += 1
-
-if drops >= 3:
-    pct_drop = ((recent_closes[-1] - recent_closes[0]) / recent_closes[0]) * 100
-    description = f"3 consecutive drops: {pct_drop:.2f}% total decline"
-    return True
-
-return False`
+                    code: '# Detect 3 or more consecutive price drops\n' +
+                          '# Returns True if anomaly detected, False otherwise\n\n' +
+                          'if len(window_data) < 3:\n' +
+                          '    return False\n\n' +
+                          '# Check last 3 closes\n' +
+                          'recent_closes = window_data[\'Close\'].tail(3).values\n' +
+                          'drops = 0\n\n' +
+                          'for i in range(1, len(recent_closes)):\n' +
+                          '    if recent_closes[i] < recent_closes[i-1]:\n' +
+                          '        drops += 1\n\n' +
+                          'if drops >= 3:\n' +
+                          '    pct_drop = ((recent_closes[-1] - recent_closes[0]) / recent_closes[0]) * 100\n' +
+                          '    description = f"3 consecutive drops: {pct_drop:.2f}% total decline"\n' +
+                          '    return True\n\n' +
+                          'return False'
                 },
                 'support': {
                     name: 'Support Level Break',
-                    code: `# Detect when price breaks below support level
-# Returns True if anomaly detected, False otherwise
-
-if len(window_data) < 20:
-    return False
-
-# Calculate support level (lowest low in window)
-support_level = window_data['Low'].min()
-current_price = current_row['Close']
-previous_price = window_data['Close'].iloc[-1]
-
-# Check if price just broke below support
-if previous_price > support_level and current_price < support_level:
-    break_pct = ((support_level - current_price) / support_level) * 100
-    description = f"Support break at ${support_level:.2f} by {break_pct:.2f}%"
-    return True
-
-return False`
+                    code: '# Detect when price breaks below support level\n' +
+                          '# Returns True if anomaly detected, False otherwise\n\n' +
+                          'if len(window_data) < 20:\n' +
+                          '    return False\n\n' +
+                          '# Calculate support level (lowest low in window)\n' +
+                          'support_level = window_data[\'Low\'].min()\n' +
+                          'current_price = current_row[\'Close\']\n' +
+                          'previous_price = window_data[\'Close\'].iloc[-1]\n\n' +
+                          '# Check if price just broke below support\n' +
+                          'if previous_price > support_level and current_price < support_level:\n' +
+                          '    break_pct = ((support_level - current_price) / support_level) * 100\n' +
+                          '    description = f"Support break at ${support_level:.2f} by {break_pct:.2f}%"\n' +
+                          '    return True\n\n' +
+                          'return False'
                 }
             };
 
