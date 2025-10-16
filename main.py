@@ -5,11 +5,12 @@ No page reloads, no scrolling issues!
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 import pandas as pd
+import numpy as np
 import json
 import time
 import threading
 import os
-from anomaly import AnomalyDetector, AnomalyType
+from anomaly import AnomalyDetector, AnomalyType, Anomaly, AnomalySeverity
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'stock_streaming_secret'
@@ -37,7 +38,8 @@ streaming_state = {
         'z_threshold': 3.0,
         'volume_threshold': 2.5,
         'volatility_threshold': 2.0
-    }
+    },
+    'custom_anomalies': []
 }
 
 def load_stock_data(file_path):
@@ -64,6 +66,73 @@ def load_stock_data(file_path):
         df = df[changed].copy()
 
     return df
+
+def execute_custom_anomaly(code, window_data, current_row, current_index):
+    """
+    Safely execute custom anomaly detection code
+
+    Returns:
+        tuple: (detected: bool, description: str, severity: int)
+    """
+    try:
+        # Create restricted namespace for execution
+        namespace = {
+            'pd': pd,
+            'np': np,
+            'window_data': window_data,
+            'current_row': current_row,
+            'current_index': current_index,
+            'len': len,
+            'abs': abs,
+            'min': min,
+            'max': max,
+            'sum': sum,
+            'round': round,
+            'float': float,
+            'int': int,
+            'str': str,
+            'description': '',
+            'severity': 2,  # Default to medium
+            'detected': False,
+            '__builtins__': {
+                'True': True,
+                'False': False,
+                'None': None,
+                'range': range,
+                'enumerate': enumerate,
+            }
+        }
+
+        # Wrap code to capture return value
+        wrapped_code = f"""
+result = None
+def _detect():
+{chr(10).join('    ' + line for line in code.split(chr(10)))}
+
+try:
+    result = _detect()
+except:
+    pass
+
+if result is not None:
+    detected = result
+"""
+
+        # Execute the code
+        exec(wrapped_code, namespace)
+
+        # Get results
+        detected = namespace.get('detected', False)
+        description = namespace.get('description', 'Custom anomaly detected')
+        severity = namespace.get('severity', 2)
+
+        return detected, description, severity
+
+    except Exception as e:
+        print(f"Error executing custom anomaly code: {e}")
+        import traceback
+        traceback.print_exc()
+        return False, '', 0
 
 def stream_data():
     """Background thread that streams data via WebSocket"""
@@ -107,6 +176,38 @@ def stream_data():
                         enabled = streaming_state['enabled_anomaly_types']
                         if enabled.get(anomaly.type.value, True):
                             detector.add_anomaly(anomaly)
+
+                    # Check custom anomalies
+                    window_size = streaming_state['anomaly_config']['window_size']
+                    window_start = max(0, streaming_state['current_index'] - window_size)
+                    window_data = data.iloc[window_start:streaming_state['current_index']]
+                    current_row = data.iloc[streaming_state['current_index'] - 1]
+
+                    for custom in streaming_state['custom_anomalies']:
+                        if not custom.get('enabled', True):
+                            continue
+
+                        detected, description, severity = execute_custom_anomaly(
+                            custom['code'],
+                            window_data,
+                            current_row,
+                            streaming_state['current_index'] - 1
+                        )
+
+                        if detected:
+                            # Create custom anomaly object
+                            custom_anomaly = Anomaly(
+                                index=streaming_state['current_index'] - 1,
+                                timestamp=current_row['Datetime'],
+                                type=AnomalyType.PRICE_SPIKE,  # Use generic type for custom
+                                severity=AnomalySeverity(min(max(severity, 1), 4)),
+                                value=float(current_row['Close']),
+                                baseline=float(window_data['Close'].mean()),
+                                deviation=0.0,
+                                description=f"[{custom['name']}] {description}",
+                                metrics={'custom': True, 'name': custom['name']}
+                            )
+                            detector.add_anomaly(custom_anomaly)
 
                     # Get all anomalies detected so far
                     all_anomalies = detector.get_anomalies()
@@ -261,6 +362,32 @@ def handle_clear_anomalies():
     if streaming_state['anomaly_detector'] is not None:
         streaming_state['anomaly_detector'].clear_anomalies()
     emit('anomalies_cleared')
+
+@socketio.on('add_custom_anomaly')
+def handle_add_custom_anomaly(data):
+    """Add a custom anomaly detector"""
+    streaming_state['custom_anomalies'].append(data)
+    emit('custom_anomaly_added', {'success': True, 'id': data['id']})
+
+@socketio.on('delete_custom_anomaly')
+def handle_delete_custom_anomaly(data):
+    """Delete a custom anomaly detector"""
+    anomaly_id = data['id']
+    streaming_state['custom_anomalies'] = [
+        a for a in streaming_state['custom_anomalies'] if a['id'] != anomaly_id
+    ]
+    emit('custom_anomaly_deleted', {'success': True, 'id': anomaly_id})
+
+@socketio.on('toggle_custom_anomaly')
+def handle_toggle_custom_anomaly(data):
+    """Toggle a custom anomaly detector on/off"""
+    anomaly_id = data['id']
+    enabled = data['enabled']
+    for anomaly in streaming_state['custom_anomalies']:
+        if anomaly['id'] == anomaly_id:
+            anomaly['enabled'] = enabled
+            break
+    emit('custom_anomaly_toggled', {'success': True, 'id': anomaly_id, 'enabled': enabled})
 
 if __name__ == '__main__':
     # Start background streaming thread

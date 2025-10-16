@@ -339,6 +339,64 @@
         .collapsible-content.open {
             max-height: 1000px;
         }
+
+        .code-editor {
+            width: 100%;
+            min-height: 200px;
+            background: #0e1117;
+            color: #fafafa;
+            border: 1px solid #464651;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            resize: vertical;
+            margin: 10px 0;
+        }
+
+        .custom-anomaly-card {
+            background: #0e1117;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border-left: 3px solid #0068c9;
+        }
+
+        .custom-anomaly-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .custom-anomaly-name {
+            font-weight: bold;
+            color: #0068c9;
+        }
+
+        .delete-btn {
+            background: #ef553b;
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+        }
+
+        .delete-btn:hover {
+            background: #cc3c3c;
+        }
+
+        .example-link {
+            color: #0068c9;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 12px;
+            margin: 5px 10px;
+            display: inline-block;
+        }
+
+        .example-link:hover {
+            color: #005aa6;
+        }
     </style>
 </head>
 <body>
@@ -484,6 +542,34 @@
                         <button onclick="clearAnomalies()" style="width: 100%; margin-top: 10px;">Clear All Anomalies</button>
                     </div>
                 </div>
+
+                <div class="collapsible-section">
+                    <h2 class="collapsible-header" onclick="toggleSection(this)">💻 Custom Anomalies</h2>
+                    <div class="collapsible-content">
+                        <p style="font-size: 12px; color: #a3a8b4; margin-top: 10px;">
+                            Write Python code to detect custom anomalies. Your function receives current and window data.
+                        </p>
+
+                        <label style="font-size: 14px; margin-top: 10px; display: block;">Anomaly Name:</label>
+                        <input type="text" id="customAnomalyName" placeholder="e.g., Large Price Jump" style="width: 100%; padding: 8px; margin: 5px 0;">
+
+                        <label style="font-size: 14px; margin-top: 10px; display: block;">Detection Code:</label>
+                        <textarea id="customAnomalyCode" class="code-editor" placeholder="# Your code here..."></textarea>
+
+                        <div style="margin: 10px 0;">
+                            <strong style="font-size: 12px;">Examples:</strong><br>
+                            <a class="example-link" onclick="loadExample('rsi')">RSI Overbought/Oversold</a>
+                            <a class="example-link" onclick="loadExample('consecutive')">Consecutive Drops</a>
+                            <a class="example-link" onclick="loadExample('support')">Support/Resistance Break</a>
+                        </div>
+
+                        <button onclick="addCustomAnomaly()" class="primary" style="width: 100%; margin-top: 10px;">Add Custom Anomaly</button>
+
+                        <div id="customAnomaliesList" style="margin-top: 15px;">
+                            <!-- Custom anomalies will be listed here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -528,6 +614,7 @@
         const socket = io();
         let currentSpeed = 1;
         let allAnomalies = [];
+        let customAnomalies = [];
 
         // Initialize with first file
         window.onload = function() {
@@ -571,6 +658,161 @@
             socket.emit('clear_anomalies');
             allAnomalies = [];
             updateAnomalyDisplay();
+        }
+
+        // Load example custom anomaly code
+        function loadExample(type) {
+            const examples = {
+                'rsi': {
+                    name: 'RSI Overbought/Oversold',
+                    code: `# Calculate RSI and detect overbought/oversold conditions
+# Returns True if anomaly detected, False otherwise
+
+if len(window_data) < 14:
+    return False
+
+# Calculate RSI
+delta = window_data['Close'].diff()
+gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+rs = gain / loss
+rsi = 100 - (100 / (1 + rs))
+current_rsi = rsi.iloc[-1]
+
+# Detect overbought (>70) or oversold (<30)
+if current_rsi > 70:
+    description = f"RSI Overbought: {current_rsi:.2f}"
+    return True
+elif current_rsi < 30:
+    description = f"RSI Oversold: {current_rsi:.2f}"
+    return True
+
+return False`
+                },
+                'consecutive': {
+                    name: 'Consecutive Price Drops',
+                    code: `# Detect 3 or more consecutive price drops
+# Returns True if anomaly detected, False otherwise
+
+if len(window_data) < 3:
+    return False
+
+# Check last 3 closes
+recent_closes = window_data['Close'].tail(3).values
+drops = 0
+
+for i in range(1, len(recent_closes)):
+    if recent_closes[i] < recent_closes[i-1]:
+        drops += 1
+
+if drops >= 3:
+    pct_drop = ((recent_closes[-1] - recent_closes[0]) / recent_closes[0]) * 100
+    description = f"3 consecutive drops: {pct_drop:.2f}% total decline"
+    return True
+
+return False`
+                },
+                'support': {
+                    name: 'Support Level Break',
+                    code: `# Detect when price breaks below support level
+# Returns True if anomaly detected, False otherwise
+
+if len(window_data) < 20:
+    return False
+
+# Calculate support level (lowest low in window)
+support_level = window_data['Low'].min()
+current_price = current_row['Close']
+previous_price = window_data['Close'].iloc[-1]
+
+# Check if price just broke below support
+if previous_price > support_level and current_price < support_level:
+    break_pct = ((support_level - current_price) / support_level) * 100
+    description = f"Support break at ${support_level:.2f} by {break_pct:.2f}%"
+    return True
+
+return False`
+                }
+            };
+
+            const example = examples[type];
+            if (example) {
+                document.getElementById('customAnomalyName').value = example.name;
+                document.getElementById('customAnomalyCode').value = example.code;
+            }
+        }
+
+        // Add custom anomaly
+        function addCustomAnomaly() {
+            const name = document.getElementById('customAnomalyName').value.trim();
+            const code = document.getElementById('customAnomalyCode').value.trim();
+
+            if (!name || !code) {
+                alert('Please provide both a name and code for the custom anomaly');
+                return;
+            }
+
+            const customAnomaly = {
+                id: Date.now(),
+                name: name,
+                code: code,
+                enabled: true
+            };
+
+            customAnomalies.push(customAnomaly);
+            socket.emit('add_custom_anomaly', customAnomaly);
+
+            // Clear inputs
+            document.getElementById('customAnomalyName').value = '';
+            document.getElementById('customAnomalyCode').value = '';
+
+            updateCustomAnomaliesList();
+        }
+
+        // Delete custom anomaly
+        function deleteCustomAnomaly(id) {
+            customAnomalies = customAnomalies.filter(a => a.id !== id);
+            socket.emit('delete_custom_anomaly', { id: id });
+            updateCustomAnomaliesList();
+        }
+
+        // Toggle custom anomaly
+        function toggleCustomAnomaly(id, element) {
+            const anomaly = customAnomalies.find(a => a.id === id);
+            if (anomaly) {
+                anomaly.enabled = !anomaly.enabled;
+                element.classList.toggle('active');
+                socket.emit('toggle_custom_anomaly', { id: id, enabled: anomaly.enabled });
+            }
+        }
+
+        // Update custom anomalies list display
+        function updateCustomAnomaliesList() {
+            const list = document.getElementById('customAnomaliesList');
+
+            if (customAnomalies.length === 0) {
+                list.innerHTML = '<p style="color: #a3a8b4; font-size: 12px; text-align: center;">No custom anomalies added yet.</p>';
+                return;
+            }
+
+            list.innerHTML = customAnomalies.map(anomaly => `
+                <div class="custom-anomaly-card">
+                    <div class="custom-anomaly-header">
+                        <span class="custom-anomaly-name">${anomaly.name}</span>
+                        <div>
+                            <div class="toggle-switch ${anomaly.enabled ? 'active' : ''}"
+                                 onclick="toggleCustomAnomaly(${anomaly.id}, this)"
+                                 style="display: inline-block; width: 40px; height: 20px; margin-right: 10px;">
+                                <div class="toggle-slider"></div>
+                            </div>
+                            <button class="delete-btn" onclick="deleteCustomAnomaly(${anomaly.id})">Delete</button>
+                        </div>
+                    </div>
+                    <div style="font-size: 11px; color: #a3a8b4; margin-top: 5px;">
+                        ${anomaly.code.split('\n').length} lines of code
+                    </div>
+                </div>
+            `).join('');
         }
 
         // Update anomaly display
