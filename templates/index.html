@@ -167,8 +167,177 @@
             background: #262730;
             border-radius: 8px;
             padding: 10px;
-            height: calc(100vh - 250px);
-            min-height: 500px;
+            height: 500px;
+        }
+
+        .anomaly-section {
+            background: #262730;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .anomaly-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .anomaly-badge {
+            background: #ff4b4b;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .anomaly-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .anomaly-item {
+            background: #0e1117;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #ff4b4b;
+        }
+
+        .anomaly-item.severity-1 { border-left-color: #ffa500; }
+        .anomaly-item.severity-2 { border-left-color: #ff8c00; }
+        .anomaly-item.severity-3 { border-left-color: #ff4b4b; }
+        .anomaly-item.severity-4 { border-left-color: #dc143c; }
+
+        .anomaly-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .anomaly-type {
+            font-weight: bold;
+            text-transform: capitalize;
+        }
+
+        .anomaly-timestamp {
+            color: #a3a8b4;
+            font-size: 12px;
+        }
+
+        .anomaly-description {
+            color: #fafafa;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: #464651;
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #0068c9;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(24px);
+        }
+
+        .slider-container {
+            margin: 15px 0;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .slider {
+            width: 100%;
+            height: 6px;
+            background: #464651;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #0068c9;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #0068c9;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .collapsible-section {
+            margin-bottom: 10px;
+        }
+
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+        }
+
+        .collapsible-header::before {
+            content: '▶';
+            display: inline-block;
+            margin-right: 8px;
+            transition: transform 0.3s;
+        }
+
+        .collapsible-header.open::before {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.open {
+            max-height: 1000px;
         }
     </style>
 </head>
@@ -237,6 +406,85 @@
                     <span id="dateTo">-</span>
                 </div>
             </div>
+
+            <div class="info-section">
+                <div class="collapsible-section">
+                    <h2 class="collapsible-header" onclick="toggleSection(this)">🚨 Anomaly Detection</h2>
+                    <div class="collapsible-content">
+                        <div style="margin-top: 10px;">
+                            <div class="toggle-container">
+                                <span>Price Spikes</span>
+                                <div class="toggle-switch active" onclick="toggleAnomalyType('price_spike', this)" data-type="price_spike">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                            <div class="toggle-container">
+                                <span>Price Drops</span>
+                                <div class="toggle-switch active" onclick="toggleAnomalyType('price_drop', this)" data-type="price_drop">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                            <div class="toggle-container">
+                                <span>Volume Spikes</span>
+                                <div class="toggle-switch active" onclick="toggleAnomalyType('volume_spike', this)" data-type="volume_spike">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                            <div class="toggle-container">
+                                <span>Volatility Spikes</span>
+                                <div class="toggle-switch active" onclick="toggleAnomalyType('volatility_spike', this)" data-type="volatility_spike">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                            <div class="toggle-container">
+                                <span>Gaps</span>
+                                <div class="toggle-switch active" onclick="toggleAnomalyType('gap', this)" data-type="gap">
+                                    <div class="toggle-slider"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapsible-section">
+                    <h2 class="collapsible-header" onclick="toggleSection(this)">⚙️ Detection Settings</h2>
+                    <div class="collapsible-content">
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Window Size</span>
+                                <span id="windowSizeValue">20</span>
+                            </div>
+                            <input type="range" class="slider" id="anomalyWindowSize" min="10" max="100" step="5" value="20" oninput="updateAnomalyConfig()">
+                        </div>
+
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Price Sensitivity</span>
+                                <span id="zThresholdValue">3.0</span>
+                            </div>
+                            <input type="range" class="slider" id="zThreshold" min="1.5" max="5.0" step="0.1" value="3.0" oninput="updateAnomalyConfig()">
+                        </div>
+
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Volume Threshold</span>
+                                <span id="volumeThresholdValue">2.5</span>
+                            </div>
+                            <input type="range" class="slider" id="volumeThreshold" min="1.5" max="5.0" step="0.1" value="2.5" oninput="updateAnomalyConfig()">
+                        </div>
+
+                        <div class="slider-container">
+                            <div class="slider-label">
+                                <span>Volatility Threshold</span>
+                                <span id="volatilityThresholdValue">2.0</span>
+                            </div>
+                            <input type="range" class="slider" id="volatilityThreshold" min="1.0" max="4.0" step="0.1" value="2.0" oninput="updateAnomalyConfig()">
+                        </div>
+
+                        <button onclick="clearAnomalies()" style="width: 100%; margin-top: 10px;">Clear All Anomalies</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -256,23 +504,114 @@
                     <div class="metric-delta" id="metricChangePct">0.00%</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Avg Volume</div>
-                    <div class="metric-value" id="metricVolume">0</div>
+                    <div class="metric-label">Anomalies Detected</div>
+                    <div class="metric-value" id="metricAnomalies">0</div>
                 </div>
             </div>
 
             <div id="chart"></div>
+
+            <!-- Anomaly Display Section -->
+            <div class="anomaly-section">
+                <div class="anomaly-header">
+                    <h2 style="margin: 0;">🚨 Detected Anomalies</h2>
+                    <div class="anomaly-badge" id="anomalyCount">0</div>
+                </div>
+                <div id="anomalyList" class="anomaly-list">
+                    <p style="color: #a3a8b4; text-align: center;">No anomalies detected yet. Start streaming to detect anomalies.</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         const socket = io();
         let currentSpeed = 1;
+        let allAnomalies = [];
 
         // Initialize with first file
         window.onload = function() {
             loadFile();
         };
+
+        // Collapsible sections
+        function toggleSection(header) {
+            header.classList.toggle('open');
+            const content = header.nextElementSibling;
+            content.classList.toggle('open');
+        }
+
+        // Toggle anomaly detection type
+        function toggleAnomalyType(type, element) {
+            element.classList.toggle('active');
+            const enabled = element.classList.contains('active');
+            socket.emit('toggle_anomaly_type', { type: type, enabled: enabled });
+        }
+
+        // Update anomaly detection configuration
+        function updateAnomalyConfig() {
+            const config = {
+                window_size: parseInt(document.getElementById('anomalyWindowSize').value),
+                z_threshold: parseFloat(document.getElementById('zThreshold').value),
+                volume_threshold: parseFloat(document.getElementById('volumeThreshold').value),
+                volatility_threshold: parseFloat(document.getElementById('volatilityThreshold').value)
+            };
+
+            // Update display values
+            document.getElementById('windowSizeValue').textContent = config.window_size;
+            document.getElementById('zThresholdValue').textContent = config.z_threshold.toFixed(1);
+            document.getElementById('volumeThresholdValue').textContent = config.volume_threshold.toFixed(1);
+            document.getElementById('volatilityThresholdValue').textContent = config.volatility_threshold.toFixed(1);
+
+            socket.emit('update_anomaly_config', config);
+        }
+
+        // Clear all anomalies
+        function clearAnomalies() {
+            socket.emit('clear_anomalies');
+            allAnomalies = [];
+            updateAnomalyDisplay();
+        }
+
+        // Update anomaly display
+        function updateAnomalyDisplay() {
+            const anomalyList = document.getElementById('anomalyList');
+            const anomalyCount = document.getElementById('anomalyCount');
+            const metricAnomalies = document.getElementById('metricAnomalies');
+
+            if (allAnomalies.length === 0) {
+                anomalyList.innerHTML = '<p style="color: #a3a8b4; text-align: center;">No anomalies detected yet.</p>';
+                anomalyCount.textContent = '0';
+                metricAnomalies.textContent = '0';
+                return;
+            }
+
+            // Sort by timestamp (most recent first)
+            const sorted = [...allAnomalies].sort((a, b) => b.index - a.index);
+
+            // Display anomalies
+            anomalyList.innerHTML = sorted.map(anomaly => {
+                const severityClass = `severity-${anomaly.severity}`;
+                const typeDisplay = anomaly.type.replace('_', ' ');
+                const severityNames = ['', 'Low', 'Medium', 'High', 'Critical'];
+
+                return `
+                    <div class="anomaly-item ${severityClass}">
+                        <div class="anomaly-item-header">
+                            <span class="anomaly-type">${typeDisplay}</span>
+                            <span class="anomaly-timestamp">${anomaly.timestamp}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #a3a8b4; margin-bottom: 5px;">
+                            Severity: ${severityNames[anomaly.severity]} | Deviation: ${anomaly.deviation.toFixed(2)}σ
+                        </div>
+                        <div class="anomaly-description">${anomaly.description}</div>
+                    </div>
+                `;
+            }).join('');
+
+            anomalyCount.textContent = allAnomalies.length;
+            metricAnomalies.textContent = allAnomalies.length;
+        }
 
         function loadFile() {
             const filename = document.getElementById('fileSelect').value;
@@ -287,6 +626,10 @@
                     document.getElementById('totalPoints').textContent = data.total_points.toLocaleString();
                     document.getElementById('dateFrom').textContent = data.date_from;
                     document.getElementById('dateTo').textContent = data.date_to;
+
+                    // Clear anomalies when loading new file
+                    allAnomalies = [];
+                    updateAnomalyDisplay();
                 }
             });
         }
@@ -305,6 +648,9 @@
 
         function resetStreaming() {
             socket.emit('reset_streaming');
+            // Also clear anomalies on reset
+            allAnomalies = [];
+            updateAnomalyDisplay();
         }
 
         function setSpeed(speed) {
@@ -355,19 +701,32 @@
             document.getElementById('metricChangePct').textContent = changePct.toFixed(2) + '%';
             document.getElementById('metricChangePct').className = 'metric-delta ' + (changePct >= 0 ? 'positive' : 'negative');
 
-            const avgVolume = data.volume.reduce((a, b) => a + b, 0) / data.volume.length;
-            document.getElementById('metricVolume').textContent = Math.round(avgVolume).toLocaleString();
-
             // Update progress
             document.getElementById('currentIndex').textContent = data.current_index.toLocaleString();
             const progress = (data.current_index / data.total_points * 100).toFixed(1);
             document.getElementById('progress').textContent = progress + '%';
 
+            // Update anomalies
+            if (data.anomalies) {
+                // Merge new anomalies with existing ones (avoid duplicates by index)
+                const existingIndices = new Set(allAnomalies.map(a => a.index));
+                data.anomalies.forEach(anomaly => {
+                    if (!existingIndices.has(anomaly.index)) {
+                        allAnomalies.push(anomaly);
+                    }
+                });
+                updateAnomalyDisplay();
+            }
+
+            if (data.anomaly_count !== undefined) {
+                document.getElementById('metricAnomalies').textContent = data.anomaly_count;
+            }
+
             // Update chart (smooth, no reload!)
             // Use sequential x-axis to remove gaps
             const xIndices = Array.from({length: data.close.length}, (_, i) => i);
 
-            const trace = {
+            const traces = [{
                 x: xIndices,
                 close: data.close,
                 decreasing: {line: {color: '#ef553b'}},
@@ -377,8 +736,53 @@
                 open: data.open,
                 type: 'candlestick',
                 xaxis: 'x',
-                yaxis: 'y'
-            };
+                yaxis: 'y',
+                name: 'Price'
+            }];
+
+            // Add anomaly markers
+            if (data.anomalies && data.anomalies.length > 0) {
+                const anomalyX = [];
+                const anomalyY = [];
+                const anomalyText = [];
+                const anomalyColors = [];
+
+                data.anomalies.forEach(anomaly => {
+                    // Index is now absolute since we're sending all data from start
+                    if (anomaly.index >= 0 && anomaly.index < data.close.length) {
+                        anomalyX.push(anomaly.index);
+                        anomalyY.push(anomaly.value);
+                        anomalyText.push(anomaly.description);
+
+                        // Color by severity
+                        const colors = ['', '#ffa500', '#ff8c00', '#ff4b4b', '#dc143c'];
+                        anomalyColors.push(colors[anomaly.severity] || '#ff4b4b');
+                    }
+                });
+
+                if (anomalyX.length > 0) {
+                    traces.push({
+                        x: anomalyX,
+                        y: anomalyY,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: 'Anomalies',
+                        marker: {
+                            color: anomalyColors,
+                            size: 14,
+                            symbol: 'circle',
+                            opacity: 0.8,
+                            line: {
+                                color: 'white',
+                                width: 2
+                            }
+                        },
+                        text: anomalyText,
+                        hoverinfo: 'text',
+                        showlegend: false
+                    });
+                }
+            }
 
             // Create tick labels showing every ~10th datetime
             const tickSpacing = Math.max(1, Math.floor(data.datetime.length / 10));
@@ -398,16 +802,30 @@
                     rangeslider: { visible: false },
                     tickvals: tickvals,
                     ticktext: ticktext,
-                    tickangle: -45
+                    tickangle: -45,
+                    autorange: true,
+                    fixedrange: false
                 },
                 yaxis: {
-                    gridcolor: '#464651'
+                    gridcolor: '#464651',
+                    autorange: true,
+                    fixedrange: false
                 },
                 margin: { l: 50, r: 50, t: 20, b: 70 },
-                height: document.getElementById('chart').offsetHeight - 40
+                height: 500,
+                dragmode: 'pan',
+                hovermode: 'closest',
+                uirevision: 'true'
             };
 
-            Plotly.react('chart', [trace], layout);
+            const config = {
+                scrollZoom: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                displaylogo: false
+            };
+
+            Plotly.react('chart', traces, layout, config);
         });
 
         socket.on('streaming_complete', function() {

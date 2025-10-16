@@ -9,6 +9,7 @@ import json
 import time
 import threading
 import os
+from anomaly import AnomalyDetector, AnomalyType
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'stock_streaming_secret'
@@ -22,7 +23,21 @@ streaming_state = {
     'speed_multiplier': 1,
     'window_size': 50,
     'selected_file': None,
-    'data': None
+    'data': None,
+    'anomaly_detector': None,
+    'enabled_anomaly_types': {
+        'price_spike': True,
+        'price_drop': True,
+        'volume_spike': True,
+        'volatility_spike': True,
+        'gap': True
+    },
+    'anomaly_config': {
+        'window_size': 20,
+        'z_threshold': 3.0,
+        'volume_threshold': 2.5,
+        'volatility_threshold': 2.0
+    }
 }
 
 def load_stock_data(file_path):
@@ -78,23 +93,41 @@ def stream_data():
                     len(data)
                 )
 
-                # Get windowed data
-                window_size = streaming_state['window_size']
-                start_idx = max(0, streaming_state['current_index'] - window_size)
-                window_data = data.iloc[start_idx:streaming_state['current_index']]
+                # Get all data from start to current index (so user can scroll back)
+                all_data = data.iloc[0:streaming_state['current_index']]
 
-                # Prepare data for frontend
+                # Detect anomalies if detector is enabled
+                current_anomalies = []
+                if streaming_state['anomaly_detector'] is not None:
+                    detector = streaming_state['anomaly_detector']
+                    anomaly = detector.detect(data, streaming_state['current_index'] - 1)
+
+                    # Check if anomaly type is enabled
+                    if anomaly:
+                        enabled = streaming_state['enabled_anomaly_types']
+                        if enabled.get(anomaly.type.value, True):
+                            detector.add_anomaly(anomaly)
+
+                    # Get all anomalies detected so far
+                    all_anomalies = detector.get_anomalies()
+                    for a in all_anomalies:
+                        if a.index < streaming_state['current_index']:
+                            current_anomalies.append(a.to_dict())
+
+                # Prepare data for frontend (send all data streamed so far)
                 chart_data = {
-                    'datetime': window_data['Datetime'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
-                    'open': window_data['Open'].tolist(),
-                    'high': window_data['High'].tolist(),
-                    'low': window_data['Low'].tolist(),
-                    'close': window_data['Close'].tolist(),
-                    'volume': window_data['Volume'].tolist(),
+                    'datetime': all_data['Datetime'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
+                    'open': all_data['Open'].tolist(),
+                    'high': all_data['High'].tolist(),
+                    'low': all_data['Low'].tolist(),
+                    'close': all_data['Close'].tolist(),
+                    'volume': all_data['Volume'].tolist(),
                     'current_index': streaming_state['current_index'],
                     'total_points': len(data),
                     'current_price': float(data['Close'].iloc[streaming_state['current_index'] - 1]),
-                    'start_price': float(data['Close'].iloc[0])
+                    'start_price': float(data['Close'].iloc[0]),
+                    'anomalies': current_anomalies,
+                    'anomaly_count': len(detector.get_anomalies()) if streaming_state['anomaly_detector'] else 0
                 }
 
                 # Emit data update
@@ -130,6 +163,15 @@ def load_file():
         streaming_state['data'] = data
         streaming_state['selected_file'] = filename
         streaming_state['current_index'] = 0
+
+        # Initialize anomaly detector with current config
+        config = streaming_state['anomaly_config']
+        streaming_state['anomaly_detector'] = AnomalyDetector(
+            window_size=config['window_size'],
+            z_threshold=config['z_threshold'],
+            volume_threshold=config['volume_threshold'],
+            volatility_threshold=config['volatility_threshold']
+        )
 
         return jsonify({
             'success': True,
@@ -179,6 +221,46 @@ def handle_speed(data):
 def handle_window_size(data):
     """Set window size"""
     streaming_state['window_size'] = data['size']
+
+@socketio.on('toggle_anomaly_type')
+def handle_toggle_anomaly_type(data):
+    """Toggle anomaly detection type on/off"""
+    anomaly_type = data['type']
+    enabled = data['enabled']
+    streaming_state['enabled_anomaly_types'][anomaly_type] = enabled
+    emit('anomaly_type_toggled', {'type': anomaly_type, 'enabled': enabled})
+
+@socketio.on('update_anomaly_config')
+def handle_anomaly_config(data):
+    """Update anomaly detection configuration"""
+    config = streaming_state['anomaly_config']
+
+    if 'window_size' in data:
+        config['window_size'] = data['window_size']
+    if 'z_threshold' in data:
+        config['z_threshold'] = data['z_threshold']
+    if 'volume_threshold' in data:
+        config['volume_threshold'] = data['volume_threshold']
+    if 'volatility_threshold' in data:
+        config['volatility_threshold'] = data['volatility_threshold']
+
+    # Recreate detector with new config
+    if streaming_state['anomaly_detector'] is not None:
+        streaming_state['anomaly_detector'] = AnomalyDetector(
+            window_size=config['window_size'],
+            z_threshold=config['z_threshold'],
+            volume_threshold=config['volume_threshold'],
+            volatility_threshold=config['volatility_threshold']
+        )
+
+    emit('config_updated', config)
+
+@socketio.on('clear_anomalies')
+def handle_clear_anomalies():
+    """Clear all detected anomalies"""
+    if streaming_state['anomaly_detector'] is not None:
+        streaming_state['anomaly_detector'].clear_anomalies()
+    emit('anomalies_cleared')
 
 if __name__ == '__main__':
     # Start background streaming thread
