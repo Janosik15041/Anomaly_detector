@@ -550,11 +550,46 @@
                             Write Python code to detect custom anomalies. Your function receives current and window data.
                         </p>
 
+                        <div style="background: #0e1117; padding: 10px; border-radius: 4px; border-left: 3px solid #0068c9; margin: 10px 0; font-size: 11px; font-family: 'Courier New', monospace;">
+                            <strong style="color: #0068c9;">Available Variables:</strong><br><br>
+                            <strong>window_data</strong> (DataFrame):<br>
+                            &nbsp;&nbsp;• Open, High, Low, Close, Volume<br>
+                            &nbsp;&nbsp;• Datetime<br>
+                            &nbsp;&nbsp;Ex: window_data['Close'].mean()<br><br>
+
+                            <strong>current_row</strong> (Series):<br>
+                            &nbsp;&nbsp;• Open, High, Low, Close, Volume<br>
+                            &nbsp;&nbsp;• Datetime<br>
+                            &nbsp;&nbsp;Ex: current_row['Close']<br><br>
+
+                            <strong>current_index</strong> (int):<br>
+                            &nbsp;&nbsp;• Position in dataset<br><br>
+
+                            <strong>Libraries:</strong><br>
+                            &nbsp;&nbsp;• pd (pandas), np (numpy)<br><br>
+
+                            <strong>Set these variables:</strong><br>
+                            &nbsp;&nbsp;• <span style="color: #00cc96;">description</span> = "Your message"<br>
+                            &nbsp;&nbsp;• <span style="color: #00cc96;">severity</span> = 1-4 (Low to Critical)<br>
+                            &nbsp;&nbsp;• <span style="color: #00cc96;">return True</span> to trigger anomaly
+                        </div>
+
                         <label style="font-size: 14px; margin-top: 10px; display: block;">Anomaly Name:</label>
                         <input type="text" id="customAnomalyName" placeholder="e.g., Large Price Jump" style="width: 100%; padding: 8px; margin: 5px 0;">
 
                         <label style="font-size: 14px; margin-top: 10px; display: block;">Detection Code:</label>
-                        <textarea id="customAnomalyCode" class="code-editor" placeholder="# Your code here..."></textarea>
+                        <textarea id="customAnomalyCode" class="code-editor" placeholder="# Your code here...
+# Example:
+if len(window_data) > 0:
+    avg_price = window_data['Close'].mean()
+    current_price = current_row['Close']
+
+    if current_price > avg_price * 1.05:
+        description = f'Price ${current_price:.2f} is 5% above average'
+        severity = 2
+        return True
+
+return False"></textarea>
 
                         <div style="margin: 10px 0;">
                             <strong style="font-size: 12px;">Examples:</strong><br>
