@@ -2,7 +2,7 @@ import yfinance as yf
 import pandas as pd
 
 # Configuration
-TICKER = "AAPL"
+TICKER = "TSLA"
 PERIOD = "1y"  # 5 days
 INTERVAL = "1h"  # 1 minute intervals
 
