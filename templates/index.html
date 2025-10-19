@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📈 Stock Anomaly Detector</title>
+    <title>Stock Anomaly Detector</title>
+    <link rel="icon" type="image/jpeg" href="/static/Logo.jpeg">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <style>
@@ -403,9 +404,9 @@
     <div class="container">
         <!-- Sidebar -->
         <div class="sidebar">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-                <h1>Stock Anomaly Detector</h1>
-                <img src="/static/Logo.jpeg" alt="Logo" style="height: 50px; width: auto;">
+            <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+                <img src="/static/Logo.jpeg" alt="Logo" style="height: 120px; width: auto; margin-bottom: 10px;">
+                <h1 style="font-size: 16px; text-align: center; margin: 0;">Stock Anomaly Detector</h1>
             </div>
 
             <h2>⚙️ Settings</h2>
@@ -1263,15 +1264,15 @@ return False"></textarea>
                 },
                 margin: { l: 50, r: 50, t: 20, b: 70 },
                 height: 600,
-                dragmode: 'pan',
+                dragmode: false,  // Disable dragging completely
                 hovermode: 'closest',
                 uirevision: 'true'
             };
 
             const config = {
-                scrollZoom: true,
+                scrollZoom: false,  // Disable scroll zoom
                 displayModeBar: true,
-                modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+                modeBarButtonsToRemove: ['lasso2d', 'select2d', 'pan2d', 'zoom2d', 'zoomIn2d', 'zoomOut2d', 'autoScale2d', 'resetScale2d'],
                 displaylogo: false
             };
 
