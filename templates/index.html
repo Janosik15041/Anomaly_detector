@@ -1022,37 +1022,60 @@ return False"></textarea>
                 name: 'Price'
             }];
 
-            // Add anomaly markers on price chart
+            // Add anomaly markers - separate price and volume anomalies
             if (data.anomalies && data.anomalies.length > 0) {
-                const anomalyX = [];
-                const anomalyY = [];
-                const anomalyText = [];
-                const anomalyColors = [];
+                // Price anomalies (for price chart)
+                const priceAnomalyX = [];
+                const priceAnomalyY = [];
+                const priceAnomalyText = [];
+                const priceAnomalyColors = [];
+
+                // Volume anomalies (for volume chart)
+                const volumeAnomalyX = [];
+                const volumeAnomalyY = [];
+                const volumeAnomalyText = [];
+                const volumeAnomalyColors = [];
 
                 data.anomalies.forEach(anomaly => {
                     // Index is now absolute since we're sending all data from start
                     if (anomaly.index >= 0 && anomaly.index < data.close.length) {
-                        anomalyX.push(anomaly.index);
-                        anomalyY.push(anomaly.value);
-                        anomalyText.push(anomaly.description);
-
                         // Color by severity
                         const colors = ['', '#ffa500', '#ff8c00', '#ff4b4b', '#dc143c'];
-                        anomalyColors.push(colors[anomaly.severity] || '#ff4b4b');
+                        const color = colors[anomaly.severity] || '#ff4b4b';
+
+                        // Separate volume anomalies from price anomalies
+                        if (anomaly.type === 'volume_spike') {
+                            volumeAnomalyX.push(anomaly.index);
+                            volumeAnomalyY.push(anomaly.value);
+                            volumeAnomalyText.push(anomaly.description);
+                            volumeAnomalyColors.push(color);
+                        } else {
+                            // For price anomalies, use the close price at that index
+                            // This prevents volatility spikes (which have small values) from ruining the scale
+                            const yValue = anomaly.type === 'volatility_spike'
+                                ? data.close[anomaly.index]  // Use actual price for volatility anomalies
+                                : anomaly.value;             // Use anomaly value for price/gap anomalies
+
+                            priceAnomalyX.push(anomaly.index);
+                            priceAnomalyY.push(yValue);
+                            priceAnomalyText.push(anomaly.description);
+                            priceAnomalyColors.push(color);
+                        }
                     }
                 });
 
-                if (anomalyX.length > 0) {
+                // Add price anomalies to price chart
+                if (priceAnomalyX.length > 0) {
                     traces.push({
-                        x: anomalyX,
-                        y: anomalyY,
+                        x: priceAnomalyX,
+                        y: priceAnomalyY,
                         mode: 'markers',
                         type: 'scatter',
-                        name: 'Anomalies',
+                        name: 'Price Anomalies',
                         xaxis: 'x',
                         yaxis: 'y',
                         marker: {
-                            color: anomalyColors,
+                            color: priceAnomalyColors,
                             size: 14,
                             symbol: 'circle',
                             opacity: 0.8,
@@ -1061,7 +1084,33 @@ return False"></textarea>
                                 width: 2
                             }
                         },
-                        text: anomalyText,
+                        text: priceAnomalyText,
+                        hoverinfo: 'text',
+                        showlegend: false
+                    });
+                }
+
+                // Add volume anomalies to volume chart
+                if (volumeAnomalyX.length > 0) {
+                    traces.push({
+                        x: volumeAnomalyX,
+                        y: volumeAnomalyY,
+                        mode: 'markers',
+                        type: 'scatter',
+                        name: 'Volume Anomalies',
+                        xaxis: 'x',
+                        yaxis: 'y2',  // Use y2 axis (volume chart)
+                        marker: {
+                            color: volumeAnomalyColors,
+                            size: 14,
+                            symbol: 'diamond',  // Different shape for volume anomalies
+                            opacity: 0.8,
+                            line: {
+                                color: 'white',
+                                width: 2
+                            }
+                        },
+                        text: volumeAnomalyText,
                         hoverinfo: 'text',
                         showlegend: false
                     });
