@@ -99,7 +99,7 @@
 
         .button-group {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 10px;
             margin: 15px 0;
         }
@@ -419,7 +419,6 @@
             <div class="button-group">
                 <button id="startBtn" class="primary" onclick="startStreaming()">▶️ Start</button>
                 <button id="pauseBtn" onclick="pauseStreaming()">⏸️ Pause</button>
-                <button id="stopBtn" onclick="stopStreaming()">⏹️ Stop</button>
                 <button id="resetBtn" onclick="resetStreaming()">🔄 Reset</button>
             </div>
 
@@ -923,15 +922,23 @@ return False"></textarea>
             socket.emit('pause_streaming');
         }
 
-        function stopStreaming() {
-            socket.emit('stop_streaming');
-        }
-
         function resetStreaming() {
             socket.emit('reset_streaming');
-            // Also clear anomalies on reset
+            // Clear anomalies on reset
             allAnomalies = [];
             updateAnomalyDisplay();
+
+            // Clear the chart
+            Plotly.purge('chart');
+
+            // Reset metrics
+            document.getElementById('metricPoints').textContent = '0';
+            document.getElementById('metricPrice').textContent = '$0.00';
+            document.getElementById('metricChange').textContent = '$0.00';
+            document.getElementById('metricChangePct').textContent = '0.00%';
+            document.getElementById('metricAnomalies').textContent = '0';
+            document.getElementById('currentIndex').textContent = '0';
+            document.getElementById('progress').textContent = '0.0%';
         }
 
         function setSpeed(speed) {
