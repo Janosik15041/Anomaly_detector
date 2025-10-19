@@ -186,8 +186,8 @@ def stream_data():
 
         # Check if we have enough data
         if streaming_state['current_index'] <= len(data):
-            # Only send a small window for performance on free tier
-            window_start = max(0, streaming_state['current_index'] - 100)
+            # Only send a window of recent data (last 500 points max for performance)
+            window_start = max(0, streaming_state['current_index'] - 500)
             all_data = data.iloc[window_start:streaming_state['current_index']]
         else:
             # No more data and not synthetic - stop
@@ -269,7 +269,7 @@ def stream_data():
         socketio.emit('data_update', chart_data)
 
         # Calculate delay with minimum threshold to reduce server load
-        delay = max(0.1, 1.0 / streaming_state['speed_multiplier'])  # Min 100ms between updates
+        delay = max(0.05, 1.0 / streaming_state['speed_multiplier'])  # Min 50ms between updates
         time.sleep(delay)
 
 @app.route('/')
