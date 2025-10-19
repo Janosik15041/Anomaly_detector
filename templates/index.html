@@ -1134,13 +1134,36 @@ return False"></textarea>
                 showlegend: false
             });
 
-            // Create tick labels showing every ~10th datetime
+            // Create adaptive tick labels based on time range
             const tickSpacing = Math.max(1, Math.floor(data.datetime.length / 10));
             const tickvals = [];
             const ticktext = [];
+
+            // Calculate time span to determine format
+            const firstDate = new Date(data.datetime[0]);
+            const lastDate = new Date(data.datetime[data.datetime.length - 1]);
+            const timeSpanHours = (lastDate - firstDate) / (1000 * 60 * 60);
+
             for (let i = 0; i < data.datetime.length; i += tickSpacing) {
                 tickvals.push(i);
-                ticktext.push(data.datetime[i].split(' ')[1]); // Show time only
+
+                // Adaptive formatting based on time span
+                if (timeSpanHours < 48) {
+                    // Less than 2 days: show time only (HH:MM)
+                    ticktext.push(data.datetime[i].split(' ')[1].substring(0, 5));
+                } else if (timeSpanHours < 168) {
+                    // Less than 1 week: show day and time (MM-DD HH:MM)
+                    const parts = data.datetime[i].split(' ');
+                    const datePart = parts[0].substring(5); // MM-DD
+                    const timePart = parts[1].substring(0, 5); // HH:MM
+                    ticktext.push(datePart + ' ' + timePart);
+                } else if (timeSpanHours < 720) {
+                    // Less than 30 days: show month-day (MM-DD)
+                    ticktext.push(data.datetime[i].split(' ')[0].substring(5));
+                } else {
+                    // More than 30 days: show year-month-day (YYYY-MM-DD)
+                    ticktext.push(data.datetime[i].split(' ')[0]);
+                }
             }
 
             const layout = {

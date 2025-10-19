@@ -144,126 +144,128 @@ if result is not None:
 def stream_data():
     """Background thread that streams data via WebSocket"""
     while True:
-        if streaming_state['active'] and not streaming_state['paused'] and streaming_state['data'] is not None:
-            data = streaming_state['data']
-
-            # Calculate increment based on speed
-            speed = streaming_state['speed_multiplier']
-            if speed >= 100:
-                increment = 50
-            elif speed >= 10:
-                increment = 20
-            elif speed >= 5:
-                increment = 10
-            elif speed >= 3:
-                increment = 5
-            elif speed >= 2:
-                increment = 3
-            else:
-                increment = 1
-
-            # Increment index
-            streaming_state['current_index'] += increment
-
-            # Handle synthetic data generation
-            if streaming_state['is_synthetic'] and streaming_state['synthetic_generator'] is not None:
-                # Generate new candles as needed (ensure we have enough data)
-                generator = streaming_state['synthetic_generator']
-                while len(generator.generated_candles) < streaming_state['current_index']:
-                    generator.generate_next_candle(interval_minutes=60)
-
-                # Update data reference
-                data = generator.get_dataframe()
-                streaming_state['data'] = data
-
-            # Check if we have enough data
-            if streaming_state['current_index'] <= len(data):
-                # Get all data from start to current index (so user can scroll back)
-                all_data = data.iloc[0:streaming_state['current_index']]
-            else:
-                # No more data and not synthetic - stop
-                if not streaming_state['is_synthetic']:
-                    streaming_state['active'] = False
-                    socketio.emit('streaming_complete')
-                    continue
-                else:
-                    # This shouldn't happen for synthetic, but just in case
-                    continue
-
-            # Detect anomalies if detector is enabled
-            current_anomalies = []
-            if streaming_state['anomaly_detector'] is not None:
-                detector = streaming_state['anomaly_detector']
-                anomaly = detector.detect(data, streaming_state['current_index'] - 1)
-
-                # Check if anomaly type is enabled
-                if anomaly:
-                    enabled = streaming_state['enabled_anomaly_types']
-                    if enabled.get(anomaly.type.value, True):
-                        detector.add_anomaly(anomaly)
-
-                # Check custom anomalies
-                window_size = streaming_state['anomaly_config']['window_size']
-                window_start = max(0, streaming_state['current_index'] - window_size)
-                window_data = data.iloc[window_start:streaming_state['current_index']]
-                current_row = data.iloc[streaming_state['current_index'] - 1]
-
-                for custom in streaming_state['custom_anomalies']:
-                    if not custom.get('enabled', True):
-                        continue
-
-                    detected, description, severity = execute_custom_anomaly(
-                        custom['code'],
-                        window_data,
-                        current_row,
-                        streaming_state['current_index'] - 1
-                    )
-
-                    if detected:
-                        # Create custom anomaly object
-                        custom_anomaly = Anomaly(
-                            index=streaming_state['current_index'] - 1,
-                            timestamp=current_row['Datetime'],
-                            type=AnomalyType.PRICE_SPIKE,  # Use generic type for custom
-                            severity=AnomalySeverity(min(max(severity, 1), 4)),
-                            value=float(current_row['Close']),
-                            baseline=float(window_data['Close'].mean()),
-                            deviation=0.0,
-                            description=f"[{custom['name']}] {description}",
-                            metrics={'custom': True, 'name': custom['name']}
-                        )
-                        detector.add_anomaly(custom_anomaly)
-
-                # Get all anomalies detected so far
-                all_anomalies = detector.get_anomalies()
-                for a in all_anomalies:
-                    if a.index < streaming_state['current_index']:
-                        current_anomalies.append(a.to_dict())
-
-            # Prepare data for frontend (send all data streamed so far)
-            chart_data = {
-                'datetime': all_data['Datetime'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
-                'open': all_data['Open'].tolist(),
-                'high': all_data['High'].tolist(),
-                'low': all_data['Low'].tolist(),
-                'close': all_data['Close'].tolist(),
-                'volume': all_data['Volume'].tolist(),
-                'current_index': streaming_state['current_index'],
-                'total_points': len(data),
-                'current_price': float(data['Close'].iloc[streaming_state['current_index'] - 1]),
-                'start_price': float(data['Close'].iloc[0]),
-                'anomalies': current_anomalies,
-                'anomaly_count': len(detector.get_anomalies()) if streaming_state['anomaly_detector'] else 0
-            }
-
-            # Emit data update
-            socketio.emit('data_update', chart_data)
-
-            # Calculate delay
-            delay = 1.0 / streaming_state['speed_multiplier']
-            time.sleep(delay)
-        else:
+        # Check pause/stop state at the very beginning of each iteration
+        if not streaming_state['active'] or streaming_state['paused'] or streaming_state['data'] is None:
             time.sleep(0.1)
+            continue
+
+        data = streaming_state['data']
+
+        # Calculate increment based on speed
+        speed = streaming_state['speed_multiplier']
+        if speed >= 100:
+            increment = 50
+        elif speed >= 10:
+            increment = 20
+        elif speed >= 5:
+            increment = 10
+        elif speed >= 3:
+            increment = 5
+        elif speed >= 2:
+            increment = 3
+        else:
+            increment = 1
+
+        # Increment index
+        streaming_state['current_index'] += increment
+
+        # Handle synthetic data generation
+        if streaming_state['is_synthetic'] and streaming_state['synthetic_generator'] is not None:
+            # Generate new candles as needed (ensure we have enough data)
+            generator = streaming_state['synthetic_generator']
+            while len(generator.generated_candles) < streaming_state['current_index']:
+                generator.generate_next_candle(interval_minutes=60)
+
+            # Update data reference
+            data = generator.get_dataframe()
+            streaming_state['data'] = data
+
+        # Check if we have enough data
+        if streaming_state['current_index'] <= len(data):
+            # Get all data from start to current index (so user can scroll back)
+            all_data = data.iloc[0:streaming_state['current_index']]
+        else:
+            # No more data and not synthetic - stop
+            if not streaming_state['is_synthetic']:
+                streaming_state['active'] = False
+                socketio.emit('streaming_complete')
+                continue
+            else:
+                # This shouldn't happen for synthetic, but just in case
+                continue
+
+        # Detect anomalies if detector is enabled
+        current_anomalies = []
+        if streaming_state['anomaly_detector'] is not None:
+            detector = streaming_state['anomaly_detector']
+            anomaly = detector.detect(data, streaming_state['current_index'] - 1)
+
+            # Check if anomaly type is enabled
+            if anomaly:
+                enabled = streaming_state['enabled_anomaly_types']
+                if enabled.get(anomaly.type.value, True):
+                    detector.add_anomaly(anomaly)
+
+            # Check custom anomalies
+            window_size = streaming_state['anomaly_config']['window_size']
+            window_start = max(0, streaming_state['current_index'] - window_size)
+            window_data = data.iloc[window_start:streaming_state['current_index']]
+            current_row = data.iloc[streaming_state['current_index'] - 1]
+
+            for custom in streaming_state['custom_anomalies']:
+                if not custom.get('enabled', True):
+                    continue
+
+                detected, description, severity = execute_custom_anomaly(
+                    custom['code'],
+                    window_data,
+                    current_row,
+                    streaming_state['current_index'] - 1
+                )
+
+                if detected:
+                    # Create custom anomaly object
+                    custom_anomaly = Anomaly(
+                        index=streaming_state['current_index'] - 1,
+                        timestamp=current_row['Datetime'],
+                        type=AnomalyType.PRICE_SPIKE,  # Use generic type for custom
+                        severity=AnomalySeverity(min(max(severity, 1), 4)),
+                        value=float(current_row['Close']),
+                        baseline=float(window_data['Close'].mean()),
+                        deviation=0.0,
+                        description=f"[{custom['name']}] {description}",
+                        metrics={'custom': True, 'name': custom['name']}
+                    )
+                    detector.add_anomaly(custom_anomaly)
+
+            # Get all anomalies detected so far
+            all_anomalies = detector.get_anomalies()
+            for a in all_anomalies:
+                if a.index < streaming_state['current_index']:
+                    current_anomalies.append(a.to_dict())
+
+        # Prepare data for frontend (send all data streamed so far)
+        chart_data = {
+            'datetime': all_data['Datetime'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
+            'open': all_data['Open'].tolist(),
+            'high': all_data['High'].tolist(),
+            'low': all_data['Low'].tolist(),
+            'close': all_data['Close'].tolist(),
+            'volume': all_data['Volume'].tolist(),
+            'current_index': streaming_state['current_index'],
+            'total_points': len(data),
+            'current_price': float(data['Close'].iloc[streaming_state['current_index'] - 1]),
+            'start_price': float(data['Close'].iloc[0]),
+            'anomalies': current_anomalies,
+            'anomaly_count': len(detector.get_anomalies()) if streaming_state['anomaly_detector'] else 0
+        }
+
+        # Emit data update
+        socketio.emit('data_update', chart_data)
+
+        # Calculate delay
+        delay = 1.0 / streaming_state['speed_multiplier']
+        time.sleep(delay)
 
 @app.route('/')
 def index():
