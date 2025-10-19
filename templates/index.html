@@ -856,8 +856,25 @@ return False"></textarea>
             // Display anomalies
             anomalyList.innerHTML = sorted.map(anomaly => {
                 const severityClass = `severity-${anomaly.severity}`;
-                const typeDisplay = anomaly.type.replace('_', ' ');
                 const severityNames = ['', 'Low', 'Medium', 'High', 'Critical'];
+
+                // Check if this is a custom anomaly (description starts with [)
+                const isCustom = anomaly.description.startsWith('[');
+                let typeDisplay = anomaly.type.replace('_', ' ');
+                let descriptionDisplay = anomaly.description;
+
+                if (isCustom) {
+                    // Extract custom name from description format: [CustomName] Description
+                    const match = anomaly.description.match(/^\[([^\]]+)\]\s*(.*)$/);
+                    if (match) {
+                        typeDisplay = match[1]; // Custom name
+                        descriptionDisplay = match[2]; // Description without [name]
+                    }
+                }
+
+                const deviationText = (isCustom || anomaly.deviation === 0)
+                    ? ''
+                    : ` | Deviation: ${anomaly.deviation.toFixed(2)}σ`;
 
                 return `
                     <div class="anomaly-item ${severityClass}">
@@ -866,9 +883,9 @@ return False"></textarea>
                             <span class="anomaly-timestamp">${anomaly.timestamp}</span>
                         </div>
                         <div style="font-size: 12px; color: #a3a8b4; margin-bottom: 5px;">
-                            Severity: ${severityNames[anomaly.severity]} | Deviation: ${anomaly.deviation.toFixed(2)}σ
+                            Severity: ${severityNames[anomaly.severity]}${deviationText}
                         </div>
-                        <div class="anomaly-description">${anomaly.description}</div>
+                        <div class="anomaly-description">${descriptionDisplay}</div>
                     </div>
                 `;
             }).join('');
@@ -990,6 +1007,7 @@ return False"></textarea>
             // Use sequential x-axis to remove gaps
             const xIndices = Array.from({length: data.close.length}, (_, i) => i);
 
+            // Price candlestick trace
             const traces = [{
                 x: xIndices,
                 close: data.close,
@@ -1004,7 +1022,7 @@ return False"></textarea>
                 name: 'Price'
             }];
 
-            // Add anomaly markers
+            // Add anomaly markers on price chart
             if (data.anomalies && data.anomalies.length > 0) {
                 const anomalyX = [];
                 const anomalyY = [];
@@ -1031,6 +1049,8 @@ return False"></textarea>
                         mode: 'markers',
                         type: 'scatter',
                         name: 'Anomalies',
+                        xaxis: 'x',
+                        yaxis: 'y',
                         marker: {
                             color: anomalyColors,
                             size: 14,
@@ -1047,6 +1067,23 @@ return False"></textarea>
                     });
                 }
             }
+
+            // Volume bar trace
+            traces.push({
+                x: xIndices,
+                y: data.volume,
+                type: 'bar',
+                name: 'Volume',
+                xaxis: 'x',
+                yaxis: 'y2',
+                marker: {
+                    color: data.close.map((close, i) =>
+                        i === 0 ? '#00cc96' : (close >= data.open[i] ? '#00cc96' : '#ef553b')
+                    ),
+                    opacity: 0.5
+                },
+                showlegend: false
+            });
 
             // Create tick labels showing every ~10th datetime
             const tickSpacing = Math.max(1, Math.floor(data.datetime.length / 10));
@@ -1068,15 +1105,25 @@ return False"></textarea>
                     ticktext: ticktext,
                     tickangle: -45,
                     autorange: true,
-                    fixedrange: false
+                    fixedrange: false,
+                    domain: [0, 1]
                 },
                 yaxis: {
+                    domain: [0.25, 1],
                     gridcolor: '#464651',
                     autorange: true,
-                    fixedrange: false
+                    fixedrange: false,
+                    title: 'Price'
+                },
+                yaxis2: {
+                    domain: [0, 0.2],
+                    gridcolor: '#464651',
+                    autorange: true,
+                    fixedrange: false,
+                    title: 'Volume'
                 },
                 margin: { l: 50, r: 50, t: 20, b: 70 },
-                height: 500,
+                height: 600,
                 dragmode: 'pan',
                 hovermode: 'closest',
                 uirevision: 'true'
