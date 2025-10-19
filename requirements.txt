@@ -4,12 +4,12 @@ flask-socketio==5.3.5
 python-socketio==5.10.0
 
 # Data processing and analysis
-pandas==2.1.4
-numpy==1.26.2
+pandas>=2.0.0
+numpy>=1.24.0
 
 # Stock data fetching
-yfinance==0.2.33
+yfinance>=0.2.0
 
 # WebSocket support - using gevent for production
-gevent==23.9.1
-gevent-websocket==0.10.1
+gevent>=23.9.0
+gevent-websocket>=0.10.1
