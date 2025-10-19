@@ -250,6 +250,9 @@ def stream_data():
                     current_anomalies.append(a.to_dict())
 
         # Prepare data for frontend (send all data streamed so far)
+        # For synthetic data, send string to indicate infinite stream
+        total_points = 'Infinite (Synthetic)' if streaming_state['is_synthetic'] else len(data)
+
         chart_data = {
             'datetime': all_data['Datetime'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
             'open': all_data['Open'].tolist(),
@@ -258,7 +261,7 @@ def stream_data():
             'close': all_data['Close'].tolist(),
             'volume': all_data['Volume'].tolist(),
             'current_index': streaming_state['current_index'],
-            'total_points': len(data),
+            'total_points': total_points,
             'current_price': float(data['Close'].iloc[streaming_state['current_index'] - 1]),
             'start_price': float(data['Close'].iloc[0]),
             'anomalies': current_anomalies,

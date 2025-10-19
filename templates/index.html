@@ -649,6 +649,7 @@ return False"></textarea>
         let currentSpeed = 1;
         let allAnomalies = [];
         let customAnomalies = [];
+        let chartWindowSize = 50; // User-selected window size for chart display
 
         // Initialize with first file
         window.onload = function() {
@@ -967,6 +968,7 @@ return False"></textarea>
         }
 
         function setWindowSize(size) {
+            chartWindowSize = parseInt(size);
             document.getElementById('windowSizeLabel').textContent = size;
             socket.emit('set_window_size', { size: parseInt(size) });
         }
@@ -1028,18 +1030,42 @@ return False"></textarea>
             }
 
             // Update chart (smooth, no reload!)
+            // Implement sliding window - only show last N points based on chartWindowSize
+            const totalDataPoints = data.close.length;
+            let displayData = {
+                datetime: data.datetime,
+                open: data.open,
+                high: data.high,
+                low: data.low,
+                close: data.close,
+                volume: data.volume
+            };
+
+            // If we have more data than the window size, slice to show only recent data
+            if (totalDataPoints > chartWindowSize) {
+                const startIdx = totalDataPoints - chartWindowSize;
+                displayData = {
+                    datetime: data.datetime.slice(startIdx),
+                    open: data.open.slice(startIdx),
+                    high: data.high.slice(startIdx),
+                    low: data.low.slice(startIdx),
+                    close: data.close.slice(startIdx),
+                    volume: data.volume.slice(startIdx)
+                };
+            }
+
             // Use sequential x-axis to remove gaps
-            const xIndices = Array.from({length: data.close.length}, (_, i) => i);
+            const xIndices = Array.from({length: displayData.close.length}, (_, i) => i);
 
             // Price candlestick trace
             const traces = [{
                 x: xIndices,
-                close: data.close,
+                close: displayData.close,
                 decreasing: {line: {color: '#ef553b'}},
-                high: data.high,
+                high: displayData.high,
                 increasing: {line: {color: '#00cc96'}},
-                low: data.low,
-                open: data.open,
+                low: displayData.low,
+                open: displayData.open,
                 type: 'candlestick',
                 xaxis: 'x',
                 yaxis: 'y',
@@ -1060,18 +1086,27 @@ return False"></textarea>
                 const volumeAnomalyText = [];
                 const volumeAnomalyColors = [];
 
-                // Calculate the window start index (since we're only showing recent data)
-                const windowStart = Math.max(0, data.current_index - 500);
+                // Calculate the display window boundaries
+                // windowStart is the actual data index where our display window starts
+                const actualWindowStart = totalDataPoints > chartWindowSize
+                    ? (totalDataPoints - chartWindowSize)
+                    : 0;
+
+                // Backend sends all data from max(0, current_index - 500)
+                const backendWindowStart = Math.max(0, data.current_index - 500);
 
                 data.anomalies.forEach(anomaly => {
-                    // Only show anomalies that are within the current visible window
-                    // AND within the bounds of the data we're currently displaying
-                    const localIndex = anomaly.index - windowStart;
+                    // Calculate where this anomaly is in the full data array
+                    const anomalyIndexInFullData = anomaly.index - backendWindowStart;
 
-                    if (anomaly.index >= windowStart &&
+                    // Check if this anomaly is within our visible display window
+                    if (anomaly.index >= (backendWindowStart + actualWindowStart) &&
                         anomaly.index < data.current_index &&
-                        localIndex >= 0 &&
-                        localIndex < data.close.length) {
+                        anomalyIndexInFullData >= actualWindowStart &&
+                        anomalyIndexInFullData < totalDataPoints) {
+
+                        // Map to display coordinates (0 to chartWindowSize)
+                        const displayIndex = anomalyIndexInFullData - actualWindowStart;
 
                         // Color by severity
                         const colors = ['', '#ffa500', '#ff8c00', '#ff4b4b', '#dc143c'];
@@ -1079,19 +1114,14 @@ return False"></textarea>
 
                         // Separate volume anomalies from price anomalies
                         if (anomaly.type === 'volume_spike') {
-                            volumeAnomalyX.push(localIndex);
-                            volumeAnomalyY.push(data.volume[localIndex]);
+                            volumeAnomalyX.push(displayIndex);
+                            volumeAnomalyY.push(displayData.volume[displayIndex]);
                             volumeAnomalyText.push(anomaly.description);
                             volumeAnomalyColors.push(color);
                         } else {
                             // For price anomalies, use the close price at that index
-                            // This prevents volatility spikes (which have small values) from ruining the scale
-                            const yValue = anomaly.type === 'volatility_spike'
-                                ? data.close[localIndex]  // Use actual price for volatility anomalies
-                                : data.close[localIndex]; // Use close price to keep markers on the chart
-
-                            priceAnomalyX.push(localIndex);
-                            priceAnomalyY.push(yValue);
+                            priceAnomalyX.push(displayIndex);
+                            priceAnomalyY.push(displayData.close[displayIndex]);
                             priceAnomalyText.push(anomaly.description);
                             priceAnomalyColors.push(color);
                         }
@@ -1154,14 +1184,14 @@ return False"></textarea>
             // Volume bar trace
             traces.push({
                 x: xIndices,
-                y: data.volume,
+                y: displayData.volume,
                 type: 'bar',
                 name: 'Volume',
                 xaxis: 'x',
                 yaxis: 'y2',
                 marker: {
-                    color: data.close.map((close, i) =>
-                        i === 0 ? '#00cc96' : (close >= data.open[i] ? '#00cc96' : '#ef553b')
+                    color: displayData.close.map((close, i) =>
+                        i === 0 ? '#00cc96' : (close >= displayData.open[i] ? '#00cc96' : '#ef553b')
                     ),
                     opacity: 0.5
                 },
@@ -1169,34 +1199,34 @@ return False"></textarea>
             });
 
             // Create adaptive tick labels based on time range
-            const tickSpacing = Math.max(1, Math.floor(data.datetime.length / 10));
+            const tickSpacing = Math.max(1, Math.floor(displayData.datetime.length / 10));
             const tickvals = [];
             const ticktext = [];
 
             // Calculate time span to determine format
-            const firstDate = new Date(data.datetime[0]);
-            const lastDate = new Date(data.datetime[data.datetime.length - 1]);
+            const firstDate = new Date(displayData.datetime[0]);
+            const lastDate = new Date(displayData.datetime[displayData.datetime.length - 1]);
             const timeSpanHours = (lastDate - firstDate) / (1000 * 60 * 60);
 
-            for (let i = 0; i < data.datetime.length; i += tickSpacing) {
+            for (let i = 0; i < displayData.datetime.length; i += tickSpacing) {
                 tickvals.push(i);
 
                 // Adaptive formatting based on time span
                 if (timeSpanHours < 48) {
                     // Less than 2 days: show time only (HH:MM)
-                    ticktext.push(data.datetime[i].split(' ')[1].substring(0, 5));
+                    ticktext.push(displayData.datetime[i].split(' ')[1].substring(0, 5));
                 } else if (timeSpanHours < 168) {
                     // Less than 1 week: show day and time (MM-DD HH:MM)
-                    const parts = data.datetime[i].split(' ');
+                    const parts = displayData.datetime[i].split(' ');
                     const datePart = parts[0].substring(5); // MM-DD
                     const timePart = parts[1].substring(0, 5); // HH:MM
                     ticktext.push(datePart + ' ' + timePart);
                 } else if (timeSpanHours < 720) {
                     // Less than 30 days: show month-day (MM-DD)
-                    ticktext.push(data.datetime[i].split(' ')[0].substring(5));
+                    ticktext.push(displayData.datetime[i].split(' ')[0].substring(5));
                 } else {
                     // More than 30 days: show year-month-day (YYYY-MM-DD)
-                    ticktext.push(data.datetime[i].split(' ')[0]);
+                    ticktext.push(displayData.datetime[i].split(' ')[0]);
                 }
             }
 
