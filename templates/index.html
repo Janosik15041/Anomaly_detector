@@ -1240,7 +1240,8 @@ return False"></textarea>
                     tickvals: tickvals,
                     ticktext: ticktext,
                     tickangle: -45,
-                    autorange: true,
+                    // Lock the x-axis range to prevent dragging back into empty space
+                    range: [0, displayData.close.length - 1],
                     fixedrange: false,
                     domain: [0, 1]
                 },
