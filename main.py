@@ -11,6 +11,7 @@ import time
 import threading
 import os
 from anomaly import AnomalyDetector, AnomalyType, Anomaly, AnomalySeverity
+from persistent_random_data import SyntheticStockGenerator
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'stock_streaming_secret'
@@ -26,6 +27,8 @@ streaming_state = {
     'selected_file': None,
     'data': None,
     'anomaly_detector': None,
+    'is_synthetic': False,  # Flag to indicate synthetic data mode
+    'synthetic_generator': None,  # Generator instance for synthetic data
     'enabled_anomaly_types': {
         'price_spike': True,
         'price_drop': True,
@@ -144,107 +147,121 @@ def stream_data():
         if streaming_state['active'] and not streaming_state['paused'] and streaming_state['data'] is not None:
             data = streaming_state['data']
 
-            if streaming_state['current_index'] < len(data):
-                # Calculate increment based on speed
-                speed = streaming_state['speed_multiplier']
-                if speed >= 100:
-                    increment = 50
-                elif speed >= 10:
-                    increment = 20
-                elif speed >= 5:
-                    increment = 10
-                elif speed >= 3:
-                    increment = 5
-                elif speed >= 2:
-                    increment = 3
-                else:
-                    increment = 1
+            # Calculate increment based on speed
+            speed = streaming_state['speed_multiplier']
+            if speed >= 100:
+                increment = 50
+            elif speed >= 10:
+                increment = 20
+            elif speed >= 5:
+                increment = 10
+            elif speed >= 3:
+                increment = 5
+            elif speed >= 2:
+                increment = 3
+            else:
+                increment = 1
 
-                # Increment index
-                streaming_state['current_index'] = min(
-                    streaming_state['current_index'] + increment,
-                    len(data)
-                )
+            # Increment index
+            streaming_state['current_index'] += increment
 
+            # Handle synthetic data generation
+            if streaming_state['is_synthetic'] and streaming_state['synthetic_generator'] is not None:
+                # Generate new candles as needed (ensure we have enough data)
+                generator = streaming_state['synthetic_generator']
+                while len(generator.generated_candles) < streaming_state['current_index']:
+                    generator.generate_next_candle(interval_minutes=60)
+
+                # Update data reference
+                data = generator.get_dataframe()
+                streaming_state['data'] = data
+
+            # Check if we have enough data
+            if streaming_state['current_index'] <= len(data):
                 # Get all data from start to current index (so user can scroll back)
                 all_data = data.iloc[0:streaming_state['current_index']]
-
-                # Detect anomalies if detector is enabled
-                current_anomalies = []
-                if streaming_state['anomaly_detector'] is not None:
-                    detector = streaming_state['anomaly_detector']
-                    anomaly = detector.detect(data, streaming_state['current_index'] - 1)
-
-                    # Check if anomaly type is enabled
-                    if anomaly:
-                        enabled = streaming_state['enabled_anomaly_types']
-                        if enabled.get(anomaly.type.value, True):
-                            detector.add_anomaly(anomaly)
-
-                    # Check custom anomalies
-                    window_size = streaming_state['anomaly_config']['window_size']
-                    window_start = max(0, streaming_state['current_index'] - window_size)
-                    window_data = data.iloc[window_start:streaming_state['current_index']]
-                    current_row = data.iloc[streaming_state['current_index'] - 1]
-
-                    for custom in streaming_state['custom_anomalies']:
-                        if not custom.get('enabled', True):
-                            continue
-
-                        detected, description, severity = execute_custom_anomaly(
-                            custom['code'],
-                            window_data,
-                            current_row,
-                            streaming_state['current_index'] - 1
-                        )
-
-                        if detected:
-                            # Create custom anomaly object
-                            custom_anomaly = Anomaly(
-                                index=streaming_state['current_index'] - 1,
-                                timestamp=current_row['Datetime'],
-                                type=AnomalyType.PRICE_SPIKE,  # Use generic type for custom
-                                severity=AnomalySeverity(min(max(severity, 1), 4)),
-                                value=float(current_row['Close']),
-                                baseline=float(window_data['Close'].mean()),
-                                deviation=0.0,
-                                description=f"[{custom['name']}] {description}",
-                                metrics={'custom': True, 'name': custom['name']}
-                            )
-                            detector.add_anomaly(custom_anomaly)
-
-                    # Get all anomalies detected so far
-                    all_anomalies = detector.get_anomalies()
-                    for a in all_anomalies:
-                        if a.index < streaming_state['current_index']:
-                            current_anomalies.append(a.to_dict())
-
-                # Prepare data for frontend (send all data streamed so far)
-                chart_data = {
-                    'datetime': all_data['Datetime'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
-                    'open': all_data['Open'].tolist(),
-                    'high': all_data['High'].tolist(),
-                    'low': all_data['Low'].tolist(),
-                    'close': all_data['Close'].tolist(),
-                    'volume': all_data['Volume'].tolist(),
-                    'current_index': streaming_state['current_index'],
-                    'total_points': len(data),
-                    'current_price': float(data['Close'].iloc[streaming_state['current_index'] - 1]),
-                    'start_price': float(data['Close'].iloc[0]),
-                    'anomalies': current_anomalies,
-                    'anomaly_count': len(detector.get_anomalies()) if streaming_state['anomaly_detector'] else 0
-                }
-
-                # Emit data update
-                socketio.emit('data_update', chart_data)
-
-                # Calculate delay
-                delay = 1.0 / streaming_state['speed_multiplier']
-                time.sleep(delay)
             else:
-                # Reached end
-                streaming_state['active'] = False
-                socketio.emit('streaming_complete')
+                # No more data and not synthetic - stop
+                if not streaming_state['is_synthetic']:
+                    streaming_state['active'] = False
+                    socketio.emit('streaming_complete')
+                    continue
+                else:
+                    # This shouldn't happen for synthetic, but just in case
+                    continue
+
+            # Detect anomalies if detector is enabled
+            current_anomalies = []
+            if streaming_state['anomaly_detector'] is not None:
+                detector = streaming_state['anomaly_detector']
+                anomaly = detector.detect(data, streaming_state['current_index'] - 1)
+
+                # Check if anomaly type is enabled
+                if anomaly:
+                    enabled = streaming_state['enabled_anomaly_types']
+                    if enabled.get(anomaly.type.value, True):
+                        detector.add_anomaly(anomaly)
+
+                # Check custom anomalies
+                window_size = streaming_state['anomaly_config']['window_size']
+                window_start = max(0, streaming_state['current_index'] - window_size)
+                window_data = data.iloc[window_start:streaming_state['current_index']]
+                current_row = data.iloc[streaming_state['current_index'] - 1]
+
+                for custom in streaming_state['custom_anomalies']:
+                    if not custom.get('enabled', True):
+                        continue
+
+                    detected, description, severity = execute_custom_anomaly(
+                        custom['code'],
+                        window_data,
+                        current_row,
+                        streaming_state['current_index'] - 1
+                    )
+
+                    if detected:
+                        # Create custom anomaly object
+                        custom_anomaly = Anomaly(
+                            index=streaming_state['current_index'] - 1,
+                            timestamp=current_row['Datetime'],
+                            type=AnomalyType.PRICE_SPIKE,  # Use generic type for custom
+                            severity=AnomalySeverity(min(max(severity, 1), 4)),
+                            value=float(current_row['Close']),
+                            baseline=float(window_data['Close'].mean()),
+                            deviation=0.0,
+                            description=f"[{custom['name']}] {description}",
+                            metrics={'custom': True, 'name': custom['name']}
+                        )
+                        detector.add_anomaly(custom_anomaly)
+
+                # Get all anomalies detected so far
+                all_anomalies = detector.get_anomalies()
+                for a in all_anomalies:
+                    if a.index < streaming_state['current_index']:
+                        current_anomalies.append(a.to_dict())
+
+            # Prepare data for frontend (send all data streamed so far)
+            chart_data = {
+                'datetime': all_data['Datetime'].dt.strftime('%Y-%m-%d %H:%M:%S').tolist(),
+                'open': all_data['Open'].tolist(),
+                'high': all_data['High'].tolist(),
+                'low': all_data['Low'].tolist(),
+                'close': all_data['Close'].tolist(),
+                'volume': all_data['Volume'].tolist(),
+                'current_index': streaming_state['current_index'],
+                'total_points': len(data),
+                'current_price': float(data['Close'].iloc[streaming_state['current_index'] - 1]),
+                'start_price': float(data['Close'].iloc[0]),
+                'anomalies': current_anomalies,
+                'anomaly_count': len(detector.get_anomalies()) if streaming_state['anomaly_detector'] else 0
+            }
+
+            # Emit data update
+            socketio.emit('data_update', chart_data)
+
+            # Calculate delay
+            delay = 1.0 / streaming_state['speed_multiplier']
+            time.sleep(delay)
         else:
             time.sleep(0.1)
 
@@ -255,35 +272,81 @@ def index():
     data_dir = 'data'
     data_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
 
+    # Add synthetic option at the beginning
+    data_files.insert(0, 'SYNTHETIC_continuous')
+
     return render_template('index.html', data_files=data_files)
 
 @app.route('/api/load_file', methods=['POST'])
 def load_file():
-    """Load a data file"""
+    """Load a data file or initialize synthetic data generator"""
     filename = request.json.get('filename')
-    file_path = os.path.join('data', filename)
 
     try:
-        data = load_stock_data(file_path)
-        streaming_state['data'] = data
-        streaming_state['selected_file'] = filename
-        streaming_state['current_index'] = 0
+        # Check if synthetic mode
+        if filename == 'SYNTHETIC_continuous':
+            # Find a reference file to learn patterns from
+            data_dir = 'data'
+            reference_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+            reference_file = None
+            if reference_files:
+                reference_file = os.path.join(data_dir, reference_files[0])
 
-        # Initialize anomaly detector with current config
-        config = streaming_state['anomaly_config']
-        streaming_state['anomaly_detector'] = AnomalyDetector(
-            window_size=config['window_size'],
-            z_threshold=config['z_threshold'],
-            volume_threshold=config['volume_threshold'],
-            volatility_threshold=config['volatility_threshold']
-        )
+            # Initialize synthetic generator
+            generator = SyntheticStockGenerator(reference_file=reference_file)
 
-        return jsonify({
-            'success': True,
-            'total_points': len(data),
-            'date_from': data['Datetime'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
-            'date_to': data['Datetime'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S')
-        })
+            # Generate initial batch of data
+            generator.generate_batch(num_candles=100, interval_minutes=60)
+
+            streaming_state['is_synthetic'] = True
+            streaming_state['synthetic_generator'] = generator
+            streaming_state['data'] = generator.get_dataframe()
+            streaming_state['selected_file'] = filename
+            streaming_state['current_index'] = 0
+
+            data = streaming_state['data']
+
+            # Initialize anomaly detector
+            config = streaming_state['anomaly_config']
+            streaming_state['anomaly_detector'] = AnomalyDetector(
+                window_size=config['window_size'],
+                z_threshold=config['z_threshold'],
+                volume_threshold=config['volume_threshold'],
+                volatility_threshold=config['volatility_threshold']
+            )
+
+            return jsonify({
+                'success': True,
+                'total_points': 'Infinite (Synthetic)',
+                'date_from': data['Datetime'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
+                'date_to': 'Continuous generation...'
+            })
+        else:
+            # Load regular CSV file
+            file_path = os.path.join('data', filename)
+            data = load_stock_data(file_path)
+
+            streaming_state['is_synthetic'] = False
+            streaming_state['synthetic_generator'] = None
+            streaming_state['data'] = data
+            streaming_state['selected_file'] = filename
+            streaming_state['current_index'] = 0
+
+            # Initialize anomaly detector with current config
+            config = streaming_state['anomaly_config']
+            streaming_state['anomaly_detector'] = AnomalyDetector(
+                window_size=config['window_size'],
+                z_threshold=config['z_threshold'],
+                volume_threshold=config['volume_threshold'],
+                volatility_threshold=config['volatility_threshold']
+            )
+
+            return jsonify({
+                'success': True,
+                'total_points': len(data),
+                'date_from': data['Datetime'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
+                'date_to': data['Datetime'].iloc[-1].strftime('%Y-%m-%d %H:%M:%S')
+            })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
