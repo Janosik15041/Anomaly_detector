@@ -45,10 +45,14 @@ streaming_state = {
 def load_stock_data(file_path):
     """Load stock data from CSV - no gap filling, use raw data only"""
     df = pd.read_csv(file_path)
+
+    # Handle different datetime column names
     if 'Datetime' not in df.columns and 'Date' in df.columns:
         df = df.rename(columns={'Date': 'Datetime'})
-    df['Datetime'] = pd.to_datetime(df['Datetime'])
-    df = df.sort_values('Datetime')
+
+    # Convert to datetime and remove timezone info for consistency
+    df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True).dt.tz_localize(None)
+    df = df.sort_values('Datetime').reset_index(drop=True)
 
     # Remove duplicate consecutive values (closed hours)
     # Keep only rows where price actually changes
