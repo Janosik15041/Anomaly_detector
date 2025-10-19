@@ -55,7 +55,7 @@ Write your own Python-based anomaly detectors with access to:
 
 1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone https://github.com/Janosik15041/Anomaly_detectorl
 cd Anomaly_detector
 ```
 
@@ -92,7 +92,7 @@ python main.py
 gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:8080 main:app
 ```
 
-The application will be available at `http://localhost:8080`
+The application will be available at `http://localhost:8080` Unless that port is taken on your locla machine.
 
 ### Basic Workflow
 
@@ -169,9 +169,7 @@ Anomaly_detector/
     └── *.csv                        # Historical stock data files
 ```
 
-## API Reference
 
-### WebSocket Events
 
 #### Client → Server
 
@@ -200,7 +198,7 @@ Anomaly_detector/
 | `config_updated` | `{window_size, z_threshold, ...}` | Config acknowledgment |
 | `anomalies_cleared` | - | Anomalies cleared confirmation |
 
-### REST API Endpoints
+
 
 #### POST /api/load_file
 Load a data file or initialize synthetic data generator
@@ -222,7 +220,6 @@ Load a data file or initialize synthetic data generator
 }
 ```
 
-## Configuration
 
 ### Anomaly Detection Parameters
 
@@ -260,7 +257,6 @@ Datetime,Open,High,Low,Close,Volume
 2024-01-01 09:30:00,150.00,152.50,149.75,151.00,1000000
 ```
 
-## Deployment
 
 ### Local Development
 ```bash
@@ -276,12 +272,7 @@ gunicorn --worker-class gevent --workers 1 --bind 0.0.0.0:8080 main:app
 - `PORT`: Server port (default: 8080)
 - `SECRET_KEY`: Flask secret key (default: 'stock_streaming_secret')
 
-### Cloud Deployment
-The application is configured for easy deployment to:
-- Heroku
-- Google Cloud Run
-- AWS Elastic Beanstalk
-- Azure App Service
+
 
 Ensure the `PORT` environment variable is properly configured in your deployment platform.
 
@@ -316,13 +307,6 @@ Ensure the `PORT` environment variable is properly configured in your deployment
 - Review console for execution errors
 
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Support
-
-For issues, questions, or suggestions, please open an issue in the repository, or contct me directly.
 
 ## Acknowledgments
 
