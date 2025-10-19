@@ -910,6 +910,18 @@ return False"></textarea>
                     // Clear anomalies when loading new file
                     allAnomalies = [];
                     updateAnomalyDisplay();
+
+                    // Clear the chart to remove old anomaly markers
+                    Plotly.purge('chart');
+
+                    // Reset metrics
+                    document.getElementById('metricPoints').textContent = '0';
+                    document.getElementById('metricPrice').textContent = '$0.00';
+                    document.getElementById('metricChange').textContent = '$0.00';
+                    document.getElementById('metricChangePct').textContent = '0.00%';
+                    document.getElementById('metricAnomalies').textContent = '0';
+                    document.getElementById('currentIndex').textContent = '0';
+                    document.getElementById('progress').textContent = '0.0%';
                 }
             });
         }
@@ -991,8 +1003,13 @@ return False"></textarea>
 
             // Update progress
             document.getElementById('currentIndex').textContent = data.current_index.toLocaleString();
-            const progress = (data.current_index / data.total_points * 100).toFixed(1);
-            document.getElementById('progress').textContent = progress + '%';
+            // Check if total_points is a number (not "Infinite (Synthetic)")
+            let progressText = 'N/A';
+            if (typeof data.total_points === 'number') {
+                const progress = (data.current_index / data.total_points * 100).toFixed(1);
+                progressText = progress + '%';
+            }
+            document.getElementById('progress').textContent = progressText;
 
             // Update anomalies
             if (data.anomalies) {
@@ -1043,27 +1060,37 @@ return False"></textarea>
                 const volumeAnomalyText = [];
                 const volumeAnomalyColors = [];
 
+                // Calculate the window start index (since we're only showing recent data)
+                const windowStart = Math.max(0, data.current_index - 500);
+
                 data.anomalies.forEach(anomaly => {
-                    // Index is now absolute since we're sending all data from start
-                    if (anomaly.index >= 0 && anomaly.index < data.close.length) {
+                    // Only show anomalies that are within the current visible window
+                    // AND within the bounds of the data we're currently displaying
+                    const localIndex = anomaly.index - windowStart;
+
+                    if (anomaly.index >= windowStart &&
+                        anomaly.index < data.current_index &&
+                        localIndex >= 0 &&
+                        localIndex < data.close.length) {
+
                         // Color by severity
                         const colors = ['', '#ffa500', '#ff8c00', '#ff4b4b', '#dc143c'];
                         const color = colors[anomaly.severity] || '#ff4b4b';
 
                         // Separate volume anomalies from price anomalies
                         if (anomaly.type === 'volume_spike') {
-                            volumeAnomalyX.push(anomaly.index);
-                            volumeAnomalyY.push(anomaly.value);
+                            volumeAnomalyX.push(localIndex);
+                            volumeAnomalyY.push(data.volume[localIndex]);
                             volumeAnomalyText.push(anomaly.description);
                             volumeAnomalyColors.push(color);
                         } else {
                             // For price anomalies, use the close price at that index
                             // This prevents volatility spikes (which have small values) from ruining the scale
                             const yValue = anomaly.type === 'volatility_spike'
-                                ? data.close[anomaly.index]  // Use actual price for volatility anomalies
-                                : anomaly.value;             // Use anomaly value for price/gap anomalies
+                                ? data.close[localIndex]  // Use actual price for volatility anomalies
+                                : data.close[localIndex]; // Use close price to keep markers on the chart
 
-                            priceAnomalyX.push(anomaly.index);
+                            priceAnomalyX.push(localIndex);
                             priceAnomalyY.push(yValue);
                             priceAnomalyText.push(anomaly.description);
                             priceAnomalyColors.push(color);
