@@ -463,7 +463,10 @@ if __name__ == '__main__':
     thread = threading.Thread(target=stream_data, daemon=True)
     thread.start()
 
+    # Get port from environment variable (for deployment) or default to 8080
+    port = int(os.environ.get('PORT', 8080))
+
     # Run Flask app
-    print("🚀 Starting Flask app on http://localhost:8080")
+    print(f"🚀 Starting Flask app on port {port}")
     print("📊 Stock streaming with NO page reloads!")
-    socketio.run(app, debug=True, host='0.0.0.0', port=8080, allow_unsafe_werkzeug=True)
+    socketio.run(app, debug=False, host='0.0.0.0', port=port)

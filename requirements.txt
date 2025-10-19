@@ -10,5 +10,6 @@ numpy==1.26.2
 # Stock data fetching
 yfinance==0.2.33
 
-# WebSocket support
-eventlet==0.33.3
+# WebSocket support - using gevent for production
+gevent==23.9.1
+gevent-websocket==0.10.1
