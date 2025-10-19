@@ -436,6 +436,14 @@
             <input type="range" id="windowSize" min="50" max="500" step="50" value="50" oninput="setWindowSize(this.value)">
             <p style="color: #a3a8b4; font-size: 12px;">Showing last <span id="windowSizeLabel">50</span> points</p>
 
+            <div class="toggle-container" style="margin-top: 15px;">
+                <span>🔒 Lock to Latest Data</span>
+                <div class="toggle-switch active" id="autoFollowToggle" onclick="toggleAutoFollow(this)">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
+            <p style="color: #a3a8b4; font-size: 11px; margin-top: 5px;">When off, you can pan/zoom freely</p>
+
             <div class="info-section">
                 <h2>📊 Streaming Info</h2>
                 <div class="info-row">
@@ -649,6 +657,8 @@ return False"></textarea>
         let currentSpeed = 1;
         let allAnomalies = [];
         let customAnomalies = [];
+        let autoFollow = true;  // Auto-follow new data
+        let isStreaming = false;
 
         // Initialize with first file
         window.onload = function() {
@@ -916,14 +926,27 @@ return False"></textarea>
 
         function startStreaming() {
             socket.emit('start_streaming');
+            isStreaming = true;
+            document.getElementById('startBtn').classList.add('primary');
+            document.getElementById('pauseBtn').classList.remove('primary');
         }
 
         function pauseStreaming() {
             socket.emit('pause_streaming');
+            const pauseBtn = document.getElementById('pauseBtn');
+            pauseBtn.classList.toggle('primary');
         }
 
         function resetStreaming() {
             socket.emit('reset_streaming');
+            isStreaming = false;
+            autoFollow = true;
+
+            // Reset button states
+            document.getElementById('startBtn').classList.add('primary');
+            document.getElementById('pauseBtn').classList.remove('primary');
+            document.getElementById('autoFollowToggle').classList.add('active');
+
             // Clear anomalies on reset
             allAnomalies = [];
             updateAnomalyDisplay();
@@ -957,6 +980,25 @@ return False"></textarea>
         function setWindowSize(size) {
             document.getElementById('windowSizeLabel').textContent = size;
             socket.emit('set_window_size', { size: parseInt(size) });
+        }
+
+        function toggleAutoFollow(element) {
+            autoFollow = !autoFollow;
+            element.classList.toggle('active');
+        }
+
+        // Detect when user manually pans/zooms and disable auto-follow
+        function setupChartInteraction() {
+            const chartDiv = document.getElementById('chart');
+            chartDiv.on('plotly_relayout', function(eventdata) {
+                // Check if user manually changed the axis range
+                if (eventdata['xaxis.range[0]'] !== undefined || eventdata['xaxis.autorange'] === false) {
+                    if (autoFollow && isStreaming) {
+                        autoFollow = false;
+                        document.getElementById('autoFollowToggle').classList.remove('active');
+                    }
+                }
+            });
         }
 
         // Handle status updates
@@ -1183,7 +1225,7 @@ return False"></textarea>
                     tickvals: tickvals,
                     ticktext: ticktext,
                     tickangle: -45,
-                    autorange: true,
+                    autorange: autoFollow,  // Only auto-range if following
                     fixedrange: false,
                     domain: [0, 1]
                 },
@@ -1215,7 +1257,13 @@ return False"></textarea>
                 displaylogo: false
             };
 
-            Plotly.react('chart', traces, layout, config);
+            Plotly.react('chart', traces, layout, config).then(function() {
+                // Setup interaction detection after first render
+                if (!window.chartInteractionSetup) {
+                    setupChartInteraction();
+                    window.chartInteractionSetup = true;
+                }
+            });
         });
 
         socket.on('streaming_complete', function() {
