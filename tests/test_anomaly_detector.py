@@ -15,8 +15,8 @@ from datetime import datetime, timedelta
 # Add parent directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from anomaly import AnomalyDetector, AnomalyType, Anomaly, AnomalySeverity
-from persistent_random_data import SyntheticStockGenerator
+from core.anomaly import AnomalyDetector, AnomalyType, Anomaly, AnomalySeverity
+from utils.persistent_random_data import SyntheticStockGenerator
 
 
 class TestAnomalyDetector(unittest.TestCase):

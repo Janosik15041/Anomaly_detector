@@ -3,7 +3,7 @@ Data streaming orchestrator - handles both live and historic data sources
 """
 import pandas as pd
 import numpy as np
-from live_data import LiveDataSource
+from utils.live_data import LiveDataSource
 import os
 import time
 

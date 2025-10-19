@@ -14,8 +14,8 @@ import json
 import time
 import threading
 import os
-from anomaly import AnomalyDetector, AnomalyType, Anomaly, AnomalySeverity
-from persistent_random_data import SyntheticStockGenerator
+from core.anomaly import AnomalyDetector, AnomalyType, Anomaly, AnomalySeverity
+from utils.persistent_random_data import SyntheticStockGenerator
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'stock_streaming_secret'
@@ -314,7 +314,8 @@ def load_file():
             streaming_state['selected_file'] = filename
             streaming_state['current_index'] = 0
 
-            data = streaming_state['data']
+            # Get reference to the generated data
+            synthetic_data = streaming_state['data']
 
             # Initialize anomaly detector
             config = streaming_state['anomaly_config']
@@ -328,7 +329,7 @@ def load_file():
             return jsonify({
                 'success': True,
                 'total_points': 'Infinite (Synthetic)',
-                'date_from': data['Datetime'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
+                'date_from': synthetic_data['Datetime'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
                 'date_to': 'Continuous generation...'
             })
         else:

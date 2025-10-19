@@ -8,7 +8,7 @@ import os
 # Add parent directory to path so we can import live_data
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from live_data import LiveDataSource
+from utils.live_data import LiveDataSource
 import time
 
 

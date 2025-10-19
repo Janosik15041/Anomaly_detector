@@ -13,3 +13,9 @@ yfinance>=0.2.0
 # WebSocket support - using gevent for production
 gevent>=23.9.0
 gevent-websocket>=0.10.1
+
+# Additional dependencies for async operations
+python-engineio>=4.8.0
+
+# HTTP server for production deployment
+gunicorn>=21.2.0
