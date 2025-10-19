@@ -2,6 +2,10 @@
 Flask Application with WebSocket for Real-time Stock Data Streaming
 No page reloads, no scrolling issues!
 """
+# Monkey patch for gevent compatibility
+from gevent import monkey
+monkey.patch_all()
+
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 import pandas as pd
@@ -15,7 +19,7 @@ from persistent_random_data import SyntheticStockGenerator
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'stock_streaming_secret'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent', logger=True, engineio_logger=True)
 
 # Global state
 streaming_state = {
