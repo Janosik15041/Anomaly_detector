@@ -421,7 +421,7 @@
                 <h1 style="font-size: 16px; text-align: center; margin: 0;">Stock Anomaly Detector</h1>
             </div>
 
-            <h2>⚙️ Settings</h2>
+            <h2>Settings</h2>
             <label for="fileSelect" style="color: #a3a8b4; font-size: 12px;">Select Stock Data</label>
             <select id="fileSelect" onchange="loadFile()">
                 {% for file in data_files %}
@@ -429,7 +429,7 @@
                 {% endfor %}
             </select>
 
-            <h2>🎮 Controls</h2>
+            <h2>Controls</h2>
             <div id="statusBadge" class="status-badge status-stopped">⏹️ Stopped</div>
             <div class="button-group">
                 <button id="startBtn" class="primary" onclick="startStreaming()">▶️ Start</button>
@@ -437,7 +437,7 @@
                 <button id="resetBtn" onclick="resetStreaming()">🔄 Reset</button>
             </div>
 
-            <h2>⚡ Playback Speed</h2>
+            <h2>Playback Speed</h2>
             <div class="speed-buttons">
                 <button onclick="setSpeed(1)" data-speed="1" class="active">1x</button>
                 <button onclick="setSpeed(2)" data-speed="2">2x</button>
@@ -447,12 +447,12 @@
                 <button onclick="setSpeed(100)" data-speed="100">100x</button>
             </div>
 
-            <h2>📊 Chart Window</h2>
+            <h2>Chart Window</h2>
             <input type="range" id="windowSize" min="50" max="500" step="50" value="50" oninput="setWindowSize(this.value)">
             <p style="color: #a3a8b4; font-size: 12px;">Showing last <span id="windowSizeLabel">50</span> points</p>
 
             <div class="info-section">
-                <h2>📊 Streaming Info</h2>
+                <h2>Streaming Info</h2>
                 <div class="info-row">
                     <span>Total Points:</span>
                     <span id="totalPoints">0</span>
@@ -468,7 +468,7 @@
             </div>
 
             <div class="info-section">
-                <h2>📅 Data Range</h2>
+                <h2>Data Range</h2>
                 <div class="info-row">
                     <span>From:</span>
                     <span id="dateFrom">-</span>
@@ -481,7 +481,7 @@
 
             <div class="info-section">
                 <div class="collapsible-section">
-                    <h2 class="collapsible-header" onclick="toggleSection(this)">🚨 Anomaly Detection</h2>
+                    <h2 class="collapsible-header" onclick="toggleSection(this)">Anomaly Detection</h2>
                     <div class="collapsible-content">
                         <div style="margin-top: 10px;">
                             <div class="toggle-container">
@@ -519,7 +519,7 @@
                 </div>
 
                 <div class="collapsible-section">
-                    <h2 class="collapsible-header" onclick="toggleSection(this)">⚙️ Detection Settings</h2>
+                    <h2 class="collapsible-header" onclick="toggleSection(this)">Detection Settings</h2>
                     <div class="collapsible-content">
                         <div class="slider-container">
                             <div class="slider-label">
@@ -558,7 +558,7 @@
                 </div>
 
                 <div class="collapsible-section">
-                    <h2 class="collapsible-header" onclick="toggleSection(this)">💻 Custom Anomalies</h2>
+                    <h2 class="collapsible-header" onclick="toggleSection(this)">Custom Anomalies</h2>
                     <div class="collapsible-content">
                         <p style="font-size: 12px; color: #a3a8b4; margin-top: 10px;">
                             Write Python code to detect custom anomalies. Your function receives current and window data.
@@ -652,7 +652,7 @@ return False"></textarea>
             <!-- Anomaly Display Section -->
             <div class="anomaly-section">
                 <div class="anomaly-header">
-                    <h2 style="margin: 0;">🚨 Detected Anomalies</h2>
+                    <h2 style="margin: 0;">Detected Anomalies</h2>
                     <div class="anomaly-badge" id="anomalyCount">0</div>
                 </div>
                 <div id="anomalyList" class="anomaly-list">
@@ -997,7 +997,7 @@ return False"></textarea>
             const status = data.status;
 
             if (status === 'streaming') {
-                badge.textContent = '🔴 Streaming';
+                badge.textContent = 'Streaming';
                 badge.className = 'status-badge status-streaming';
             } else if (status === 'paused') {
                 badge.textContent = '⏸️ Paused';
@@ -1295,7 +1295,7 @@ return False"></textarea>
         });
 
         socket.on('streaming_complete', function() {
-            document.getElementById('statusBadge').textContent = '✅ Complete';
+            document.getElementById('statusBadge').textContent = 'Complete';
             document.getElementById('statusBadge').className = 'status-badge status-stopped';
         });
     </script>
