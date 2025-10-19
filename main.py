@@ -1,52 +1,80 @@
 """
 Flask Application with WebSocket for Real-time Stock Data Streaming
-No page reloads, no scrolling issues!
+
+This application provides a real-time stock data streaming interface with:
+- WebSocket-based live updates (no page reloads)
+- Anomaly detection using statistical methods
+- Support for both historical CSV data and synthetic data generation
+- Customizable anomaly detection rules via user-defined Python code
+- Interactive controls for playback speed and visualization
 """
-# Monkey patch for gevent compatibility
+
+# Monkey patch for gevent compatibility - must be done before other imports
+# This enables gevent's async capabilities for Flask-SocketIO
 from gevent import monkey
 monkey.patch_all()
 
+# Standard library imports
+import time
+import threading
+import os
+import traceback
+
+# Third-party imports
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO, emit
 import pandas as pd
 import numpy as np
-import json
-import time
-import threading
-import os
+
+# Local imports
 from core.anomaly import AnomalyDetector, AnomalyType, Anomaly, AnomalySeverity
 from utils.persistent_random_data import SyntheticStockGenerator
 
+# Initialize Flask application and SocketIO
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'stock_streaming_secret'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent', logger=True, engineio_logger=True)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode='gevent',
+    logger=True,
+    engineio_logger=True
+)
 
-# Global state
+# ============================================================================
+# GLOBAL STATE MANAGEMENT
+# ============================================================================
+# This dictionary maintains the application's runtime state across all clients
 streaming_state = {
-    'active': False,
-    'paused': False,
-    'current_index': 0,
-    'speed_multiplier': 1,
-    'window_size': 50,
-    'selected_file': None,
-    'data': None,
-    'anomaly_detector': None,
-    'is_synthetic': False,  # Flag to indicate synthetic data mode
-    'synthetic_generator': None,  # Generator instance for synthetic data
-    'enabled_anomaly_types': {
+    # Streaming control
+    'active': False,              # Whether streaming is currently active
+    'paused': False,              # Whether streaming is paused
+    'current_index': 0,           # Current position in the data stream
+    'speed_multiplier': 1,        # Playback speed (1x, 2x, 3x, etc.)
+    'window_size': 50,            # Number of data points to display on chart
+
+    # Data management
+    'selected_file': None,        # Currently loaded data file name
+    'data': None,                 # Pandas DataFrame containing stock data
+    'is_synthetic': False,        # Whether using synthetic data generation
+    'synthetic_generator': None,  # SyntheticStockGenerator instance
+
+    # Anomaly detection
+    'anomaly_detector': None,     # AnomalyDetector instance
+    'enabled_anomaly_types': {    # Which built-in anomaly types are active
         'price_spike': True,
         'price_drop': True,
         'volume_spike': True,
         'volatility_spike': True,
         'gap': True
     },
-    'anomaly_config': {
-        'window_size': 20,
-        'z_threshold': 3.0,
-        'volume_threshold': 2.5,
-        'volatility_threshold': 2.0
+    'anomaly_config': {           # Anomaly detection parameters
+        'window_size': 20,        # Rolling window size for calculations
+        'z_threshold': 3.0,       # Z-score threshold for price anomalies
+        'volume_threshold': 2.5,  # Threshold for volume spike detection
+        'volatility_threshold': 2.0  # Threshold for volatility detection
     },
-    'custom_anomalies': []
+    'custom_anomalies': []        # User-defined custom anomaly detectors
 }
 
 def load_stock_data(file_path):
@@ -122,7 +150,7 @@ def _detect():
 
 try:
     result = _detect()
-except:
+except Exception:  # pylint: disable=broad-except
     pass
 
 if result is not None:
@@ -130,7 +158,7 @@ if result is not None:
 """
 
         # Execute the code
-        exec(wrapped_code, namespace)
+        exec(wrapped_code, namespace)  # pylint: disable=exec-used
 
         # Get results
         detected = namespace.get('detected', False)
@@ -314,9 +342,6 @@ def load_file():
             streaming_state['selected_file'] = filename
             streaming_state['current_index'] = 0
 
-            # Get reference to the generated data
-            synthetic_data = streaming_state['data']
-
             # Initialize anomaly detector
             config = streaming_state['anomaly_config']
             streaming_state['anomaly_detector'] = AnomalyDetector(
@@ -329,7 +354,7 @@ def load_file():
             return jsonify({
                 'success': True,
                 'total_points': 'Infinite (Synthetic)',
-                'date_from': synthetic_data['Datetime'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
+                'date_from': streaming_state['data']['Datetime'].iloc[0].strftime('%Y-%m-%d %H:%M:%S'),
                 'date_to': 'Continuous generation...'
             })
         else:

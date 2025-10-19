@@ -155,25 +155,18 @@ return False
 
 ```
 Anomaly_detector/
-├── main.py                          # Flask application & WebSocket handlers (entry point)
-├── core/                            # Core business logic
-│   ├── __init__.py
-│   └── anomaly.py                   # Anomaly detection classes and algorithms
-├── utils/                           # Utility modules
-│   ├── __init__.py
-│   ├── persistent_random_data.py    # Synthetic data generator
-│   ├── fetch_data.py                # Historical data fetching utilities
-│   ├── live_data.py                 # Live data source handler
-│   └── streamer.py                  # Data streaming orchestrator
+├── main.py                          # Flask application & WebSocket handlers
+├── anomaly.py                       # Anomaly detection classes and algorithms
+├── persistent_random_data.py        # Synthetic data generator
+├── fetch_data.py                    # Historical data fetching utilities
+├── requirements.txt                 # Python dependencies
 ├── templates/
 │   └── index.html                   # Frontend UI
 ├── static/
 │   ├── Logo.png                     # Application logo
 │   └── favicon-32x32.png           # Browser favicon
-├── data/
-│   └── *.csv                        # Historical stock data files
-├── requirements.txt                 # Python dependencies
-└── README.md                        # This file
+└── data/
+    └── *.csv                        # Historical stock data files
 ```
 
 ## API Reference
@@ -322,9 +315,6 @@ Ensure the `PORT` environment variable is properly configured in your deployment
 - Verify you're using allowed functions and variables
 - Review console for execution errors
 
-## License
-
-[Specify your license here]
 
 ## Contributing
 
@@ -332,7 +322,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Support
 
-For issues, questions, or suggestions, please open an issue in the repository.
+For issues, questions, or suggestions, please open an issue in the repository, or contct me directly.
 
 ## Acknowledgments
 
