@@ -660,6 +660,16 @@ return False"></textarea>
         let autoFollow = true;  // Auto-follow new data
         let isStreaming = false;
 
+        // Keep ALL data on client side
+        let allChartData = {
+            datetime: [],
+            open: [],
+            high: [],
+            low: [],
+            close: [],
+            volume: []
+        };
+
         // Initialize with first file
         window.onload = function() {
             loadFile();
@@ -951,6 +961,16 @@ return False"></textarea>
             allAnomalies = [];
             updateAnomalyDisplay();
 
+            // Clear ALL accumulated chart data
+            allChartData = {
+                datetime: [],
+                open: [],
+                high: [],
+                low: [],
+                close: [],
+                volume: []
+            };
+
             // Clear the chart
             Plotly.purge('chart');
 
@@ -1052,19 +1072,34 @@ return False"></textarea>
                 document.getElementById('metricAnomalies').textContent = data.anomaly_count;
             }
 
-            // Update chart (smooth, no reload!)
-            // Use sequential x-axis to remove gaps
-            const xIndices = Array.from({length: data.close.length}, (_, i) => i);
+            // Accumulate data on client side (keep all historical data)
+            // Server sends last 100 points, but we merge with existing data
+            for (let i = 0; i < data.datetime.length; i++) {
+                const currentLength = allChartData.datetime.length;
+                // Only add if this is new data (not already in our array)
+                if (currentLength === 0 || allChartData.datetime[currentLength - 1] !== data.datetime[i]) {
+                    allChartData.datetime.push(data.datetime[i]);
+                    allChartData.open.push(data.open[i]);
+                    allChartData.high.push(data.high[i]);
+                    allChartData.low.push(data.low[i]);
+                    allChartData.close.push(data.close[i]);
+                    allChartData.volume.push(data.volume[i]);
+                }
+            }
 
-            // Price candlestick trace
+            // Update chart (smooth, no reload!) using ALL accumulated data
+            // Use sequential x-axis to remove gaps
+            const xIndices = Array.from({length: allChartData.close.length}, (_, i) => i);
+
+            // Price candlestick trace using ALL accumulated data
             const traces = [{
                 x: xIndices,
-                close: data.close,
+                close: allChartData.close,
                 decreasing: {line: {color: '#ef553b'}},
-                high: data.high,
+                high: allChartData.high,
                 increasing: {line: {color: '#00cc96'}},
-                low: data.low,
-                open: data.open,
+                low: allChartData.low,
+                open: allChartData.open,
                 type: 'candlestick',
                 xaxis: 'x',
                 yaxis: 'y',
@@ -1087,7 +1122,7 @@ return False"></textarea>
 
                 data.anomalies.forEach(anomaly => {
                     // Index is now absolute since we're sending all data from start
-                    if (anomaly.index >= 0 && anomaly.index < data.close.length) {
+                    if (anomaly.index >= 0 && anomaly.index < allChartData.close.length) {
                         // Color by severity
                         const colors = ['', '#ffa500', '#ff8c00', '#ff4b4b', '#dc143c'];
                         const color = colors[anomaly.severity] || '#ff4b4b';
@@ -1102,7 +1137,7 @@ return False"></textarea>
                             // For price anomalies, use the close price at that index
                             // This prevents volatility spikes (which have small values) from ruining the scale
                             const yValue = anomaly.type === 'volatility_spike'
-                                ? data.close[anomaly.index]  // Use actual price for volatility anomalies
+                                ? allChartData.close[anomaly.index]  // Use actual price for volatility anomalies
                                 : anomaly.value;             // Use anomaly value for price/gap anomalies
 
                             priceAnomalyX.push(anomaly.index);
@@ -1166,69 +1201,82 @@ return False"></textarea>
                 }
             }
 
-            // Volume bar trace
+            // Volume bar trace using ALL accumulated data
             traces.push({
                 x: xIndices,
-                y: data.volume,
+                y: allChartData.volume,
                 type: 'bar',
                 name: 'Volume',
                 xaxis: 'x',
                 yaxis: 'y2',
                 marker: {
-                    color: data.close.map((close, i) =>
-                        i === 0 ? '#00cc96' : (close >= data.open[i] ? '#00cc96' : '#ef553b')
+                    color: allChartData.close.map((close, i) =>
+                        i === 0 ? '#00cc96' : (close >= allChartData.open[i] ? '#00cc96' : '#ef553b')
                     ),
                     opacity: 0.5
                 },
                 showlegend: false
             });
 
-            // Create adaptive tick labels based on time range
-            const tickSpacing = Math.max(1, Math.floor(data.datetime.length / 10));
+            // Create adaptive tick labels based on time range using ALL data
+            const tickSpacing = Math.max(1, Math.floor(allChartData.datetime.length / 10));
             const tickvals = [];
             const ticktext = [];
 
             // Calculate time span to determine format
-            const firstDate = new Date(data.datetime[0]);
-            const lastDate = new Date(data.datetime[data.datetime.length - 1]);
+            const firstDate = new Date(allChartData.datetime[0]);
+            const lastDate = new Date(allChartData.datetime[allChartData.datetime.length - 1]);
             const timeSpanHours = (lastDate - firstDate) / (1000 * 60 * 60);
 
-            for (let i = 0; i < data.datetime.length; i += tickSpacing) {
+            for (let i = 0; i < allChartData.datetime.length; i += tickSpacing) {
                 tickvals.push(i);
 
                 // Adaptive formatting based on time span
                 if (timeSpanHours < 48) {
                     // Less than 2 days: show time only (HH:MM)
-                    ticktext.push(data.datetime[i].split(' ')[1].substring(0, 5));
+                    ticktext.push(allChartData.datetime[i].split(' ')[1].substring(0, 5));
                 } else if (timeSpanHours < 168) {
                     // Less than 1 week: show day and time (MM-DD HH:MM)
-                    const parts = data.datetime[i].split(' ');
+                    const parts = allChartData.datetime[i].split(' ');
                     const datePart = parts[0].substring(5); // MM-DD
                     const timePart = parts[1].substring(0, 5); // HH:MM
                     ticktext.push(datePart + ' ' + timePart);
                 } else if (timeSpanHours < 720) {
                     // Less than 30 days: show month-day (MM-DD)
-                    ticktext.push(data.datetime[i].split(' ')[0].substring(5));
+                    ticktext.push(allChartData.datetime[i].split(' ')[0].substring(5));
                 } else {
                     // More than 30 days: show year-month-day (YYYY-MM-DD)
-                    ticktext.push(data.datetime[i].split(' ')[0]);
+                    ticktext.push(allChartData.datetime[i].split(' ')[0]);
                 }
+            }
+
+            // If auto-follow is enabled, center on latest data
+            let xaxisConfig = {
+                gridcolor: '#464651',
+                rangeslider: { visible: false },
+                tickvals: tickvals,
+                ticktext: ticktext,
+                tickangle: -45,
+                fixedrange: false,
+                domain: [0, 1]
+            };
+
+            if (autoFollow) {
+                // Center on latest 100 points when locked
+                const viewWindow = 100;
+                const endIndex = allChartData.close.length - 1;
+                const startIndex = Math.max(0, endIndex - viewWindow);
+                xaxisConfig.range = [startIndex, endIndex];
+                xaxisConfig.autorange = false;
+            } else {
+                xaxisConfig.autorange = false;  // Let user control when unlocked
             }
 
             const layout = {
                 paper_bgcolor: '#262730',
                 plot_bgcolor: '#262730',
                 font: { color: '#fafafa' },
-                xaxis: {
-                    gridcolor: '#464651',
-                    rangeslider: { visible: false },
-                    tickvals: tickvals,
-                    ticktext: ticktext,
-                    tickangle: -45,
-                    autorange: autoFollow,  // Only auto-range if following
-                    fixedrange: false,
-                    domain: [0, 1]
-                },
+                xaxis: xaxisConfig,
                 yaxis: {
                     domain: [0.25, 1],
                     gridcolor: '#464651',
